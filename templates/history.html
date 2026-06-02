@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Search History{% endblock %}
+{% block page_title %}Search History{% endblock %}
+
+{% block content %}
+<div class="d-flex align-center justify-between mb-3">
+  <div>
+    <h2 style="margin:0;font-size:1.3rem;font-weight:800">Search History</h2>
+    <p style="margin:0;color:var(--text-secondary);font-size:.875rem">
+      Your previous medication identification searches
+    </p>
+  </div>
+  <a href="{{ url_for('identify') }}" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-plus"></i> New Search
+  </a>
+</div>
+
+<!-- Filter bar -->
+<form method="GET" action="{{ url_for('history') }}" style="margin-bottom:16px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <!-- Text search -->
+    <div style="flex:1;min-width:200px">
+      <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin-bottom:4px;font-weight:600">
+        <i class="fa-solid fa-magnifying-glass"></i> Search
+      </label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Medication name or description…"
+             class="form-control" style="font-size:.85rem">
+    </div>
+    <!-- Confidence filter -->
+    <div style="min-width:150px">
+      <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin-bottom:4px;font-weight:600">
+        <i class="fa-solid fa-gauge-high"></i> Confidence
+      </label>
+      <select name="conf" class="form-control" style="font-size:.85rem">
+        <option value="">All levels</option>
+        <option value="high"   {{ 'selected' if conf == 'high' }}>High ≥ 80%</option>
+        <option value="medium" {{ 'selected' if conf == 'medium' }}>Medium 50–79%</option>
+        <option value="low"    {{ 'selected' if conf == 'low' }}>Low &lt; 50%</option>
+      </select>
+    </div>
+    <!-- Match filter -->
+    <div style="min-width:140px">
+      <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin-bottom:4px;font-weight:600">
+        <i class="fa-solid fa-filter"></i> Result
+      </label>
+      <select name="match" class="form-control" style="font-size:.85rem">
+        <option value="">All searches</option>
+        <option value="1" {{ 'selected' if has_match == '1' }}>With match</option>
+        <option value="0" {{ 'selected' if has_match == '0' }}>No match</option>
+      </select>
+    </div>
+    <!-- Buttons -->
+    <div style="display:flex;gap:6px;padding-bottom:1px">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-filter"></i> Filter
+      </button>
+      {% if q or conf or has_match %}
+      <a href="{{ url_for('history') }}" class="btn btn-outline btn-sm">
+        <i class="fa-solid fa-xmark"></i> Clear
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  <!-- Active filter summary -->
+  {% if q or conf or has_match %}
+  <div style="margin-top:8px;font-size:.78rem;color:var(--text-secondary)">
+    Showing {{ searches.total }} result{{ 's' if searches.total != 1 }} ·
+    {% if q %}<strong>query:</strong> "{{ q }}"{% endif %}
+    {% if conf %} · <strong>confidence:</strong> {{ conf }}{% endif %}
+    {% if has_match == '1' %} · matched only{% elif has_match == '0' %} · no-match only{% endif %}
+  </div>
+  {% endif %}
+</form>
+
+{% if searches.items %}
+  {% for s in searches.items %}
+  <div class="history-item">
+    <div class="history-icon">
+      {% if s.top_confidence >= 0.8 %}
+        <i class="fa-solid fa-check-circle" style="color:var(--success)"></i>
+      {% elif s.top_confidence >= 0.5 %}
+        <i class="fa-solid fa-magnifying-glass" style="color:var(--warning)"></i>
+      {% else %}
+        <i class="fa-solid fa-magnifying-glass"></i>
+      {% endif %}
+    </div>
+    <div style="flex:1;min-width:0">
+      <div class="history-desc">{{ s.description[:80] }}{% if s.description|length > 80 %}…{% endif %}</div>
+      <div class="history-meta">
+        {% if s.top_result %}
+          <span style="color:var(--success);font-weight:600">→ {{ s.top_result }}</span>
+          <span class="confidence-badge {{ 'high' if s.top_confidence > 0.8 else 'medium' if s.top_confidence > 0.6 else 'low' }}"
+                style="margin-left:6px">
+            {{ (s.top_confidence * 100)|round(0)|int }}%
+          </span>
+          <span style="margin-left:8px">{{ s.result_count }} result{{ 's' if s.result_count != 1 }}</span>
+        {% else %}
+          <span style="color:var(--danger)">No match found</span>
+        {% endif %}
+        <span style="margin-left:8px;color:var(--text-secondary)">
+          <i class="fa-regular fa-clock"></i> {{ s.created_at.strftime('%d %b %Y, %H:%M') }}
+        </span>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <!-- Re-run search -->
+      <a href="{{ url_for('identify') }}" class="btn btn-outline btn-sm"
+         onclick="sessionStorage.setItem('prefillDesc', '{{ s.description[:80]|replace("'","") }}');return true"
+         title="Re-run search">
+        <i class="fa-solid fa-rotate-right"></i>
+      </a>
+      <!-- Delete -->
+      <form method="POST" action="{{ url_for('delete_history', search_id=s.id) }}" style="display:inline">
+        <button class="btn btn-sm btn-danger" title="Delete"
+                data-confirm="Delete this search record?">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Results preview -->
+  {% if s.results %}
+  <div style="margin:-6px 0 12px 58px;padding:12px;background:var(--bg);border-radius:0 0 var(--radius-sm) var(--radius-sm);border:1px solid var(--border);border-top:none">
+    <div style="font-size:.78rem;color:var(--text-secondary);font-weight:600;margin-bottom:6px">Results:</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% for r in s.results[:4] %}
+      <span style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:.78rem">
+        {{ r.medication }}
+        <span class="confidence-badge {{ r.confidence_level or 'medium' }}" style="margin-left:4px;font-size:.65rem">
+          {{ r.confidence_pct or (r.confidence_score * 100)|round(0)|int }}%
+        </span>
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  <!-- Pagination -->
+  {% if searches.pages > 1 %}
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:24px">
+    {% if searches.has_prev %}
+    <a href="{{ url_for('history', page=searches.prev_num, q=q, conf=conf, match=has_match) }}" class="btn btn-outline btn-sm">
+      <i class="fa-solid fa-chevron-left"></i> Previous
+    </a>
+    {% endif %}
+    <span style="font-size:.875rem;color:var(--text-secondary)">
+      Page {{ searches.page }} of {{ searches.pages }}
+    </span>
+    {% if searches.has_next %}
+    <a href="{{ url_for('history', page=searches.next_num, q=q, conf=conf, match=has_match) }}" class="btn btn-outline btn-sm">
+      Next <i class="fa-solid fa-chevron-right"></i>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% else %}
+  <div class="no-result-box" style="margin-top:20px">
+    <div class="no-result-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+    <div class="no-result-title">No search history yet</div>
+    <div class="no-result-text">Your medication identification searches will appear here.</div>
+    <a href="{{ url_for('identify') }}" class="btn btn-primary mt-2" style="display:inline-flex">
+      <i class="fa-solid fa-magnifying-glass-plus"></i> Identify Your First Medication
+    </a>
+  </div>
+{% endif %}
+
+{% block extra_js %}
+<script>
+// Prefill from sessionStorage if navigating from history
+const prefill = sessionStorage.getItem('prefillDesc');
+if (prefill) {
+  sessionStorage.removeItem('prefillDesc');
+  const el = document.getElementById('medicationDesc');
+  if (el) el.value = prefill;
+}
+</script>
+{% endblock %}
+{% endblock %}

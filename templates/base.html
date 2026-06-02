@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CAPSULE{% endblock %} — AI Medication Identification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-wrapper">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-name">CAPSULE</span>
+        <span class="sidebar-brand-sub">AI · Taif University</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Main</span>
+
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <a href="{{ url_for('admin_dashboard') }}"
+         class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+        <i class="fa-solid fa-gauge-high"></i> Dashboard
+      </a>
+      {% elif current_user.is_authenticated and current_user.role == 'doctor' %}
+      <a href="{{ url_for('doctor_dashboard') }}"
+         class="{% if request.endpoint == 'doctor_dashboard' %}active{% endif %}">
+        <i class="fa-solid fa-gauge-high"></i> Dashboard
+      </a>
+      {% elif current_user.is_authenticated and current_user.role == 'pharmacist' %}
+      <a href="{{ url_for('pharmacist_dashboard') }}"
+         class="{% if request.endpoint == 'pharmacist_dashboard' %}active{% endif %}">
+        <i class="fa-solid fa-gauge-high"></i> Dashboard
+      </a>
+      {% elif current_user.is_authenticated and current_user.role == 'patient' %}
+      <a href="{{ url_for('patient_dashboard') }}"
+         class="{% if request.endpoint == 'patient_dashboard' %}active{% endif %}">
+        <i class="fa-solid fa-gauge-high"></i> My Dashboard
+      </a>
+      {% else %}
+      <a href="{{ url_for('dashboard') }}"
+         class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <i class="fa-solid fa-gauge-high"></i> Dashboard
+      </a>
+      {% endif %}
+
+      <a href="{{ url_for('identify') }}"
+         class="{% if request.endpoint == 'identify' %}active{% endif %}">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> Identify Medication
+      </a>
+
+      {% if current_user.is_authenticated and current_user.role == 'patient' %}
+      <span class="sidebar-section-label">My Health</span>
+      <a href="{{ url_for('patient_medications') }}"
+         class="{% if request.endpoint in ('patient_medications','patient_add_medication') %}active{% endif %}">
+        <i class="fa-solid fa-pills"></i> My Medications
+      </a>
+      <a href="{{ url_for('add_patient_medication') }}">
+        <i class="fa-solid fa-plus-circle"></i> Add Medication
+      </a>
+      {% endif %}
+
+      <span class="sidebar-section-label">Clinical</span>
+
+      <a href="{{ url_for('history') }}"
+         class="{% if request.endpoint == 'history' %}active{% endif %}">
+        <i class="fa-solid fa-clock-rotate-left"></i> Search History
+      </a>
+
+      {% if current_user.is_authenticated and current_user.role in ('pharmacist', 'admin') %}
+      <a href="{{ url_for('pharmacist_dispense') }}"
+         class="{% if request.endpoint == 'pharmacist_dispense' %}active{% endif %}">
+        <i class="fa-solid fa-hand-holding-medical"></i> Dispense Log
+      </a>
+      {% endif %}
+
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <span class="sidebar-section-label">Administration</span>
+      <a href="{{ url_for('admin_dashboard') }}#users">
+        <i class="fa-solid fa-users"></i> Users
+      </a>
+      <a href="{{ url_for('admin_dashboard') }}#drugs">
+        <i class="fa-solid fa-database"></i> Medications
+      </a>
+      <a href="{{ url_for('admin_dashboard') }}#logs">
+        <i class="fa-solid fa-list-check"></i> System Logs
+      </a>
+      <a href="{{ url_for('admin_evaluation') }}"
+         class="{% if request.endpoint == 'admin_evaluation' %}active{% endif %}">
+        <i class="fa-solid fa-chart-line"></i> Model Evaluation
+      </a>
+      {% endif %}
+
+      <span class="sidebar-section-label">Account</span>
+      <a href="{{ url_for('profile') }}"
+         class="{% if request.endpoint == 'profile' %}active{% endif %}">
+        <i class="fa-solid fa-user-gear"></i> My Profile
+      </a>
+<a href="{{ url_for('about') }}"
+         class="{% if request.endpoint == 'about' %}active{% endif %}">
+        <i class="fa-solid fa-circle-info"></i> About CAPSULE
+      </a>
+      <a href="{{ url_for('logout') }}" style="color:#f87171">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">
+          {% if current_user.is_authenticated %}{{ current_user.full_name[0].upper() if current_user.full_name else current_user.username[0].upper() }}{% else %}?{% endif %}
+        </div>
+        <div>
+          <div class="user-info-name">
+            {% if current_user.is_authenticated %}{{ current_user.full_name or current_user.username }}{% else %}Guest{% endif %}
+          </div>
+          <div class="user-info-role">{% if current_user.is_authenticated %}{{ current_user.role_label }}{% endif %}</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ─────────────────────────────────────────────────────────────── -->
+  <div class="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="d-flex align-center gap-1">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+      </div>
+      <div class="topbar-right">
+        <a href="{{ url_for('identify') }}" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-magnifying-glass-plus"></i>
+          <span class="d-none d-sm-inline">Identify Medicine</span>
+        </a>
+        <a href="{{ url_for('profile') }}" class="topbar-btn" title="Profile">
+          <i class="fa-solid fa-user"></i>
+        </a>
+        <a href="{{ url_for('logout') }}" class="topbar-btn" title="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
+      </div>
+    </header>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="padding:16px 28px 0">
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'danger' if cat == 'error' else cat }}" data-auto-dismiss>
+              <i class="fa-solid {{ 'fa-check-circle' if cat == 'success' else 'fa-exclamation-circle' }}"></i>
+              {{ msg }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Page content -->
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

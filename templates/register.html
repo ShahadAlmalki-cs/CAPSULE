@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — CAPSULE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card" style="max-width:520px">
+    <div class="auth-card-header">
+      <img src="{{ url_for('static', filename='images/Logo.jpg') }}" alt="CAPSULE Logo">
+      <h1>CAPSULE</h1>
+      <p>Create your healthcare account</p>
+    </div>
+    <div class="auth-card-body">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'danger' if cat == 'error' else cat }}">
+            <i class="fa-solid fa-exclamation-circle"></i> {{ msg }}
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('register') }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label" for="username">Username *</label>
+            <input type="text" id="username" name="username" class="form-control"
+                   placeholder="username" required minlength="3">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" class="form-control"
+                   placeholder="Dr. Name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address *</label>
+          <input type="email" id="email" name="email" class="form-control"
+                 placeholder="you@hospital.sa" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Role *</label>
+          <div id="roleCards" style="display:flex;gap:10px;flex-wrap:wrap">
+            {% for r, label, icon in [('patient','Patient','fa-person'), ('doctor','Doctor','fa-user-doctor'), ('pharmacist','Pharmacist','fa-pills')] %}
+            <label class="role-card" style="flex:1;min-width:100px;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.8rem;font-weight:600;transition:all .2s{% if r == 'patient' %};border-color:var(--primary);background:var(--primary-light){% endif %}">
+              <input type="radio" name="role" value="{{ r }}" style="display:none" {{ 'checked' if r == 'patient' }}>
+              <i class="fa-solid {{ icon }}" style="font-size:1.2rem;color:var(--primary)"></i>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="hospital">Hospital / Institution</label>
+          <input type="text" id="hospital" name="hospital" class="form-control"
+                 placeholder="e.g., King Faisal Hospital">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label" for="password">Password *</label>
+            <input type="password" id="password" name="password" class="form-control"
+                   placeholder="Min 6 characters" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="confirm_password">Confirm *</label>
+            <input type="password" id="confirm_password" name="confirm_password"
+                   class="form-control" placeholder="Repeat password" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100" style="justify-content:center">
+          <i class="fa-solid fa-user-plus"></i> Create Account
+        </button>
+      </form>
+
+      <div class="auth-divider">— or —</div>
+      <div style="text-align:center;font-size:.875rem">
+        Already have an account?
+        <a href="{{ url_for('login') }}" style="font-weight:700">Sign In</a>
+      </div>
+      <div style="text-align:center;margin-top:14px;font-size:.8rem;color:var(--text-secondary)">
+        <a href="{{ url_for('index') }}" style="color:var(--text-secondary)">
+          <i class="fa-solid fa-arrow-left"></i> Back to Home
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('#roleCards .role-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('#roleCards .role-card').forEach(c => {
+        c.style.borderColor = 'var(--border)';
+        c.style.background = 'transparent';
+      });
+
+      card.style.borderColor = 'var(--primary)';
+      card.style.background = 'var(--primary-light)';
+
+      const input = card.querySelector('input[type="radio"]');
+      if (input) input.checked = true;
+    });
+  });
+</script>
+</html>

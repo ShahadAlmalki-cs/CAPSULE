@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Dispense Log — CAPSULE{% endblock %}
+{% block page_title %}Dispense Log{% endblock %}
+
+{% block content %}
+<style>
+  .warning-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+                   z-index:999; align-items:center; justify-content:center; padding:20px; }
+  .warning-modal.open { display:flex; }
+  .warning-box { background:var(--card-bg); border-radius:var(--radius); max-width:520px; width:100%;
+                 border:2px solid #fcd34d; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .warning-box-header { background:#fffbeb; padding:20px 24px; border-bottom:1px solid #fcd34d;
+                         border-radius:var(--radius) var(--radius) 0 0; }
+</style>
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+
+  <!-- ── Dispense Form ──────────────────────────────────────────────────────── -->
+  <div>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-hand-holding-medical" style="color:var(--primary)"></i> Record Dispense</h3>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('pharmacist_dispense') }}" id="dispenseForm">
+
+          <div class="form-group">
+            <label class="form-label">Patient Name *</label>
+            <input type="text" name="patient_name" class="form-control"
+                   placeholder="Patient full name" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Medication *</label>
+            <select name="medication_id" id="medicationSelect" class="form-control" required onchange="onMedChange(this)">
+              <option value="">— Select Medication —</option>
+              {% for med in drugs %}
+              <option value="{{ med.id }}" data-name="{{ med.drug_name }}" data-lt="{{ med.long_term_description or '' }}">
+                {{ med.drug_name }}{% if med.dosage_form %} ({{ med.dosage_form }}){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Long-term preview -->
+          <div id="ltPreview" style="display:none" class="mb-3">
+            <div style="border:1.5px solid #fcd34d;background:#fffbeb;border-radius:var(--radius-sm);padding:14px">
+              <strong style="color:#92400e;font-size:.875rem">
+                <i class="fa-solid fa-clock-rotate-left"></i> Long-Term Use Warning
+              </strong>
+              <div id="ltPreviewText" style="font-size:.82rem;color:#78350f;margin-top:6px"></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group">
+              <label class="form-label">Patient Informed?</label>
+              <select name="patient_informed" class="form-control">
+                <option value="1">Yes — patient counselled</option>
+                <option value="0">No</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">LT Warning Shown?</label>
+              <select name="long_term_warning_shown" id="ltWarnSelect" class="form-control">
+                <option value="0">No / Not applicable</option>
+                <option value="1">Yes — warning given</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="2"
+                      placeholder="Any dispensing notes…"></textarea>
+          </div>
+
+          <button type="button" class="btn btn-primary" onclick="confirmDispense()">
+            <i class="fa-solid fa-circle-check"></i> Record Dispense
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Recent Dispense Log -->
+    <div class="card recent-dispense-card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-list-check" style="color:var(--secondary)"></i> Recent Dispenses</h3>
+      </div>
+      {% if logs %}
+      <div class="card-body" style="padding:0">
+        <table class="table dispense-table" style="margin:0">
+          <thead>
+            <tr><th>Patient</th><th>Medication</th><th>Time</th><th>LT Warned</th><th>Informed</th></tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td>
+                  {% set patient_name = log.patient_name or 'Unknown patient' %}
+                  {% if '<' in patient_name or 'script' in patient_name|lower %}
+                      Test Patient
+                  {% else %}
+                      {{ patient_name|striptags|truncate(28, True, '...') }}
+                  {% endif %}
+              </td>       
+             <td style="font-size:.82rem">{{ log.medication_name }}</td>
+              <td style="font-size:.78rem;color:var(--text-secondary)">
+                {{ log.dispensed_at.strftime('%d %b %Y %H:%M') }}
+              </td>
+              <td>
+                {% if log.long_term_warning_shown %}
+                <span style="color:#16a34a"><i class="fa-solid fa-check"></i></span>
+                {% else %}
+                <span style="color:var(--text-secondary)">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if log.patient_informed %}
+                <span style="color:#16a34a"><i class="fa-solid fa-check"></i></span>
+                {% else %}
+                <span style="color:#dc2626"><i class="fa-solid fa-xmark"></i></span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body" style="text-align:center;padding:30px;color:var(--text-secondary);font-size:.875rem">
+        No dispense records yet.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+  <div>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--primary)"></i> Quick Stats</h3>
+      </div>
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center">
+        <div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--primary)">{{ logs|length }}</div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">Total Dispenses</div>
+        </div>
+        <div>
+          <div style="font-size:1.75rem;font-weight:800;color:#d97706">
+            {{ logs | selectattr('long_term_warning_shown') | list | length }}
+          </div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">LT Warnings Given</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-shield-heart" style="color:var(--secondary)"></i> Dispensing Guidelines</h3>
+      </div>
+      <div class="card-body" style="font-size:.82rem;color:var(--text-secondary)">
+        <ul style="margin:0;padding-left:18px;line-height:2.2">
+          <li>Verify patient identity before dispensing</li>
+          <li>Check for known allergies in patient notes</li>
+          <li>Provide long-term warnings for flagged medicines</li>
+          <li>Document patient counselling in notes</li>
+          <li>Report adverse reactions to supervising doctor</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Long-Term Warning Modal ──────────────────────────────────────────────── -->
+<div class="warning-modal" id="ltModal">
+  <div class="warning-box">
+    <div class="warning-box-header">
+      <h3 style="margin:0;color:#92400e;font-size:1rem">
+        <i class="fa-solid fa-triangle-exclamation"></i> Long-Term Medicine Use Warning
+      </h3>
+    </div>
+    <div style="padding:20px 24px">
+      <div id="ltModalContent" style="font-size:.875rem;color:var(--text-secondary);margin-bottom:20px"></div>
+      <div class="d-flex gap-1">
+        <button class="btn btn-primary" onclick="closeLtModal(true)">
+          <i class="fa-solid fa-check"></i> Acknowledged — Proceed
+        </button>
+        <button class="btn btn-outline" onclick="closeLtModal(false)">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let hasPendingLt = false;
+
+function onMedChange(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const lt  = opt.getAttribute('data-lt') || '';
+  const ltDiv = document.getElementById('ltPreview');
+  if (lt && lt.trim()) {
+    document.getElementById('ltPreviewText').textContent = lt;
+    ltDiv.style.display = 'block';
+    document.getElementById('ltWarnSelect').value = '1';
+    hasPendingLt = true;
+  } else {
+    ltDiv.style.display = 'none';
+    hasPendingLt = false;
+  }
+}
+
+function confirmDispense() {
+  if (hasPendingLt) {
+    const lt = document.getElementById('ltPreviewText').textContent;
+    document.getElementById('ltModalContent').innerHTML =
+      '<strong>This medication has long-term use concerns:</strong><br><br>' + lt +
+      '<br><br>Please confirm the patient has been informed before dispensing.';
+    document.getElementById('ltModal').classList.add('open');
+  } else {
+    document.getElementById('dispenseForm').submit();
+  }
+}
+
+function closeLtModal(proceed) {
+  document.getElementById('ltModal').classList.remove('open');
+  if (proceed) {
+    document.getElementById('ltWarnSelect').value = '1';
+    document.getElementById('dispenseForm').submit();
+  }
+}
+
+// Close modal on backdrop click
+document.getElementById('ltModal').addEventListener('click', function(e) {
+  if (e.target === this) closeLtModal(false);
+});
+</script>
+{% endblock %}

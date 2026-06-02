@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Doctor Dashboard{% endblock %}
+{% block page_title %}Doctor Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div style="background:linear-gradient(135deg,#1e40af,#5b21b6);border-radius:var(--radius);padding:28px 32px;color:#fff;margin-bottom:28px;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;background:rgba(255,255,255,.06);border-radius:50%"></div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="width:56px;height:56px;background:rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
+      <i class="fa-solid fa-user-doctor"></i>
+    </div>
+    <div>
+      <h2 style="margin:0 0 4px;font-weight:800;font-size:1.4rem">
+        {% set display_name = current_user.full_name or current_user.username %}
+        {% if display_name.lower().startswith('dr.') or display_name.lower().startswith('dr ') %}
+          {{ display_name }}
+        {% else %}
+          Dr. {{ display_name }}
+        {% endif %}
+      </h2>
+      <p style="margin:0;opacity:.85;font-size:.85rem">
+        {{ current_user.specialty or 'Physician' }} · {{ current_user.hospital or 'Hospital' }}
+      </p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <a href="{{ url_for('identify') }}" class="btn btn-white btn-sm">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> New Identification
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+    <div>
+      <div class="stat-value">{{ total_patients }}</div>
+      <div class="stat-label">Registered Patients</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="stat-value">{{ high_risk_count }}</div>
+      <div class="stat-label">High-Risk Patients</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="fa-solid fa-magnifying-glass"></i></div>
+    <div>
+      <div class="stat-value">{{ total_searches }}</div>
+      <div class="stat-label">Identifications Made</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fa-solid fa-pills"></i></div>
+    <div>
+      <div class="stat-value">{{ drugs | length }}</div>
+      <div class="stat-label">Medicines in DB</div>
+    </div>
+  </div>
+</div>
+
+<!-- Patient Tracking + Recent Cases -->
+<div style="display:grid;grid-template-columns:1fr 380px;gap:24px;margin-bottom:24px">
+
+  <!-- Patient List -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-users" style="color:var(--primary)"></i> Patient Overview</h3>
+      <span style="font-size:.75rem;color:var(--text-secondary)">{{ total_patients }} patients registered</span>
+    </div>
+
+    {% if patient_data %}
+    <!-- Search bar -->
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+      <input type="text" id="patientSearch" placeholder="Search patient by name or username…"
+             class="form-control" style="font-size:.85rem"
+             oninput="filterPatients(this.value)">
+    </div>
+
+    <div style="overflow-y:auto;max-height:440px" id="patientList">
+      {% for pd in patient_data %}
+      {% set p = pd.user %}
+      <div class="patient-row" data-name="{{ (p.full_name or p.username) | lower }}"
+           style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .15s;cursor:pointer"
+           onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <!-- Avatar -->
+        <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0;
+                    background:{{ '#fee2e2' if pd.is_high_risk else '#dbeafe' }};
+                    color:{{ '#b91c1c' if pd.is_high_risk else '#1d4ed8' }}">
+          {{ (p.full_name or p.username)[0] | upper }}
+        </div>
+        <!-- Info -->
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            {{ p.full_name or p.username }}
+          </div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">@{{ p.username }}</div>
+        </div>
+        <!-- Medication count -->
+        <div style="text-align:center;min-width:54px">
+          <div style="font-weight:700;font-size:.95rem;color:var(--primary)">{{ pd.current_meds }}</div>
+          <div style="font-size:.65rem;color:var(--text-secondary)">current<br>meds</div>
+        </div>
+        <!-- Risk badge -->
+        <div style="min-width:80px;text-align:right">
+          {% if pd.lt_warnings > 0 %}
+          <span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 8px;white-space:nowrap">
+            <i class="fa-solid fa-clock"></i> {{ pd.lt_warnings }} LT
+          </span>
+          {% elif pd.current_meds > 0 %}
+          <span style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 8px">
+            <i class="fa-solid fa-check"></i> OK
+          </span>
+          {% else %}
+          <span style="color:var(--text-secondary);font-size:.75rem">No meds</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px 24px;color:var(--text-secondary)">
+      <i class="fa-solid fa-users" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:12px"></i>
+      <p style="margin:0;font-size:.875rem">No patients registered yet.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right column -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+
+    <!-- Quick Actions -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-bolt" style="color:var(--warning)"></i> Quick Actions</h3>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+        <a href="{{ url_for('identify') }}" class="btn btn-primary" style="justify-content:center">
+          <i class="fa-solid fa-magnifying-glass-plus"></i> Identify Medication
+        </a>
+        <a href="{{ url_for('history') }}" class="btn btn-outline" style="justify-content:center">
+          <i class="fa-solid fa-clock-rotate-left"></i> Search History
+        </a>
+      <a href="#drug-reference"
+        class="btn btn-outline" style="justify-content:center">
+        <i class="fa-solid fa-book-medical"></i> Drug Reference
+      </a> 
+      </div>
+    </div>
+
+    <!-- Recent Cases -->
+    <div class="card" style="flex:1">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--secondary)"></i> Recent Searches</h3>
+        <a href="{{ url_for('history') }}" style="font-size:.8rem;color:var(--primary)">All →</a>
+      </div>
+      <div style="overflow-y:auto;max-height:280px">
+        {% if recent %}
+          {% for s in recent %}
+          <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+            <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              {{ s.description[:42] }}{% if s.description|length > 42 %}…{% endif %}
+            </div>
+            <div style="font-size:.72rem;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:6px">
+              {% if s.top_result %}
+                <span style="color:var(--success);font-weight:600">→ {{ s.top_result[:25] }}</span>
+                <span class="confidence-badge {{ 'high' if s.top_confidence > 0.8 else 'medium' if s.top_confidence > 0.6 else 'low' }}" style="font-size:.62rem">
+                  {{ (s.top_confidence * 100)|round(0)|int }}%
+                </span>
+              {% endif %}
+              <span style="margin-left:auto">{{ s.time_ago }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center;padding:32px;color:var(--text-secondary);font-size:.875rem">No identifications yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Drug Reference -->
+<div class="card" id="drug-reference">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-pills" style="color:var(--success)"></i> Medicine Reference</h3>
+  </div>
+  <div class="card-body" style="padding:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+      {% for drug in drugs[:12] %}
+      <a href="{{ url_for('medication_detail', med_id=drug.id) }}"
+         style="text-decoration:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;display:block;transition:all .2s"
+         onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-weight:700;font-size:.875rem;color:var(--text-primary)">{{ drug.display_name }}</div>
+        <div style="font-size:.75rem;color:var(--text-secondary)">{{ drug.generic_name }}</div>
+        <div style="font-size:.72rem;margin-top:4px">
+          <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 6px">{{ drug.dosage_form }}</span>
+          {% if drug.category %}
+          <span style="background:#ede9fe;color:#5b21b6;border-radius:4px;padding:1px 6px;margin-left:3px">{{ drug.category[:15] }}</span>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+function filterPatients(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('#patientList .patient-row').forEach(row => {
+    const name = row.dataset.name || '';
+    row.style.display = (!q || name.includes(q)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

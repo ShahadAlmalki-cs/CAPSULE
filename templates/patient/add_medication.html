@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% block title %}Add Medication — CAPSULE{% endblock %}
+{% block page_title %}Add Medication{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+
+  <a href="{{ url_for('patient_medications') }}" class="btn btn-outline" style="margin-bottom:20px">
+    <i class="fa-solid fa-arrow-left"></i> Back to My Medications
+  </a>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-plus-circle" style="color:var(--primary)"></i> Add New Medication</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('add_patient_medication') }}" id="addMedForm">
+
+        <div class="form-group">
+          <label class="form-label">Medication Name *</label>
+          <input type="text" name="medication_name" id="medNameInput" class="form-control"
+                 placeholder="e.g., Metformin, Aspirin, Amlodipine…" required autocomplete="off"
+                 list="drugSuggestions">
+          <datalist id="drugSuggestions">
+            {% for d in drugs %}
+            <option value="{{ d.drug_name }}">
+            {% endfor %}
+          </datalist>
+          <div style="font-size:.75rem;color:var(--text-secondary);margin-top:4px">
+            Start typing to search from the CAPSULE medicine database
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Dosage</label>
+            <input type="text" name="dosage" class="form-control" placeholder="e.g., 500mg twice daily">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-control">
+              <option value="current" selected>Current (taking now)</option>
+              <option value="previous">Previous / Stopped</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Start Date</label>
+            <input type="date" name="start_date" class="form-control"
+                   value="{{ today.strftime('%Y-%m-%d') if today else '' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Date <span style="color:var(--text-secondary)">(if applicable)</span></label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Prescribed By</label>
+          <input type="text" name="prescribed_by" class="form-control" placeholder="Doctor's name or clinic">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="3"
+                    placeholder="Any notes about this medication — side effects, reminders, etc."></textarea>
+        </div>
+
+        <!-- Long-term warning area -->
+        <div id="longTermWarning" style="display:none" class="mb-3">
+          <div style="border:1.5px solid #fcd34d;background:#fffbeb;border-radius:var(--radius);padding:16px">
+            <h4 style="margin:0 0 8px;color:#92400e;font-size:.9rem">
+              <i class="fa-solid fa-clock-rotate-left"></i> Long-Term Use Notice
+            </h4>
+            <div id="longTermContent" style="font-size:.82rem;color:#78350f"></div>
+          </div>
+        </div>
+
+        <!-- Inline interaction banner (shown while user types) -->
+        <div id="interactionBanner" style="display:none;border:2px solid #fca5a5;background:#fef2f2;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;font-size:1.1rem;flex-shrink:0"></i>
+            <div>
+              <strong style="color:#991b1b;font-size:.88rem" id="bannerTitle">Interaction detected</strong>
+              <div style="font-size:.78rem;color:#b91c1c;margin-top:2px" id="bannerSummary"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-1">
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <i class="fa-solid fa-plus"></i> Add Medication
+          </button>
+          <a href="{{ url_for('patient_medications') }}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detailed interaction panel (scrollable, shown below form) -->
+  <div id="interactionPreview" style="display:none" class="card mt-3">
+    <div class="card-header" style="background:#fef2f2;border-bottom-color:#fca5a5">
+      <h3 class="card-title" style="color:#991b1b;font-size:.9rem">
+        <i class="fa-solid fa-triangle-exclamation"></i> Possible Interactions with Your Current Medications
+      </h3>
+    </div>
+    <div id="interactionContent" class="card-body" style="padding:14px"></div>
+  </div>
+
+</div>
+
+<!-- ── Conflict Confirmation Modal ─────────────────────────────────────────── -->
+<div id="interactionModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;
+            align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:var(--radius);max-width:520px;width:100%;
+              box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;max-height:90vh;display:flex;flex-direction:column">
+
+    <!-- Modal header -->
+    <div id="modalHeader"
+         style="padding:20px 24px;border-bottom:2px solid #fca5a5;background:#fef2f2;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:50%;background:#fee2e2;display:flex;
+                    align-items:center;justify-content:center;flex-shrink:0">
+          <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;font-size:1.1rem"></i>
+        </div>
+        <div>
+          <h3 style="margin:0;color:#991b1b;font-size:1rem;font-weight:800">Medication Conflict Detected</h3>
+          <div style="font-size:.78rem;color:#b91c1c;margin-top:2px" id="modalSubtitle"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal body -->
+    <div id="modalInteractionContent"
+         style="padding:20px 24px;overflow-y:auto;flex:1"></div>
+
+    <!-- Modal footer -->
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;
+                gap:10px;justify-content:flex-end;flex-shrink:0;background:#fafafa">
+      <button type="button" class="btn btn-outline" onclick="closeModal()">
+        <i class="fa-solid fa-arrow-left"></i> Go Back
+      </button>
+      <button type="button" class="btn btn-danger" id="addAnywayBtn">
+        <i class="fa-solid fa-plus"></i> Add Anyway
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const medInput  = document.getElementById('medNameInput');
+  const form      = document.getElementById('addMedForm');
+  const submitBtn = document.getElementById('submitBtn');
+  let debounceTimer  = null;
+  let lastInteractions = [];   // cached from last AJAX call
+  let interactionChecked = false;  // has a check been done for current input?
+  let skipConfirm = false;         // set true when user confirmed via modal
+
+  // ── Live checks while typing ──────────────────────────────────────────────
+  medInput.addEventListener('change', () => {
+    const name = medInput.value.trim();
+    if (name.length < 2) return;
+    checkLongTerm(name);
+    runInteractionCheck(name);
+  });
+
+  medInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    interactionChecked = false;
+    lastInteractions = [];
+    hideBanner();
+    const name = medInput.value.trim();
+    if (name.length < 2) return;
+    debounceTimer = setTimeout(() => {
+      checkLongTerm(name);
+      runInteractionCheck(name);
+    }, 600);
+  });
+
+  // ── Form submit gate ──────────────────────────────────────────────────────
+  form.addEventListener('submit', function (e) {
+    if (skipConfirm) {
+      skipConfirm = false;
+      return;  // user already confirmed — allow submit
+    }
+
+    e.preventDefault();
+
+    const name = medInput.value.trim();
+    if (!name) { form.submit(); return; }
+
+    if (interactionChecked) {
+      // Result already available — decide immediately
+      if (lastInteractions.length > 0) {
+        showModal(lastInteractions);
+      } else {
+        skipConfirm = true;
+        form.submit();
+      }
+    } else {
+      // Check hasn't completed yet — run it now then decide
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking…';
+      submitBtn.disabled  = true;
+      fetchInteractions(name).then(interactions => {
+        submitBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Medication';
+        submitBtn.disabled  = false;
+        if (interactions.length > 0) {
+          showModal(interactions);
+        } else {
+          skipConfirm = true;
+          form.submit();
+        }
+      }).catch(() => {
+        submitBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Medication';
+        submitBtn.disabled  = false;
+        skipConfirm = true;
+        form.submit();
+      });
+    }
+  });
+
+  // ── Confirm: add despite conflict ─────────────────────────────────────────
+  document.getElementById('addAnywayBtn').addEventListener('click', () => {
+    closeModal();
+    skipConfirm = true;
+    form.submit();
+  });
+
+  // Close on backdrop click
+  document.getElementById('interactionModal').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── API helpers ───────────────────────────────────────────────────────────
+  function fetchInteractions(name) {
+    return fetch('/api/patient/check-interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_drug: name })
+    }).then(r => r.json()).then(data => {
+      lastInteractions   = data.interactions || [];
+      interactionChecked = true;
+      return lastInteractions;
+    });
+  }
+
+  function runInteractionCheck(name) {
+    fetchInteractions(name).then(interactions => {
+      if (interactions.length) {
+        renderPreviewPanel(interactions);
+        showBanner(interactions);
+      } else {
+        document.getElementById('interactionPreview').style.display = 'none';
+        hideBanner();
+      }
+    }).catch(() => {});
+  }
+
+  function checkLongTerm(name) {
+    fetch('/api/patient/long-term-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ medication_name: name })
+    }).then(r => r.json()).then(data => {
+      if (data.has_long_term) {
+        document.getElementById('longTermContent').innerHTML =
+          (data.description ? '<p style="margin:0 0 6px">' + data.description + '</p>' : '') +
+          (data.warning ? '<strong><i class="fa-solid fa-hand-holding-medical"></i> ' + data.warning + '</strong>' : '');
+        document.getElementById('longTermWarning').style.display = 'block';
+      } else {
+        document.getElementById('longTermWarning').style.display = 'none';
+      }
+    }).catch(() => {});
+  }
+
+  // ── Banner (inline, above submit) ─────────────────────────────────────────
+  const RISK_COLOR = {
+    high:   { border: '#fca5a5', bg: '#fef2f2', title: '#991b1b', summary: '#b91c1c', icon: 'fa-circle-xmark' },
+    medium: { border: '#fcd34d', bg: '#fffbeb', title: '#92400e', summary: '#b45309', icon: 'fa-triangle-exclamation' },
+    low:    { border: '#93c5fd', bg: '#eff6ff', title: '#1e40af', summary: '#2563eb', icon: 'fa-circle-info' },
+  };
+
+  function highestRisk(interactions) {
+    if (interactions.some(i => i.risk_level === 'high'))   return 'high';
+    if (interactions.some(i => i.risk_level === 'medium')) return 'medium';
+    return 'low';
+  }
+
+  function showBanner(interactions) {
+    const level   = highestRisk(interactions);
+    const c       = RISK_COLOR[level];
+    const banner  = document.getElementById('interactionBanner');
+    banner.style.borderColor  = c.border;
+    banner.style.background   = c.bg;
+    document.getElementById('bannerTitle').style.color   = c.title;
+    document.getElementById('bannerSummary').style.color = c.summary;
+    const count  = interactions.length;
+    const drugList = [...new Set(
+      interactions.flatMap(i => [i.drug_a, i.drug_b])
+        .filter(n => !medInput.value.toLowerCase().includes(n.toLowerCase()))
+    )].slice(0, 3).join(', ');
+    document.getElementById('bannerTitle').textContent =
+      `${level.toUpperCase()} — ${count} interaction${count > 1 ? 's' : ''} found`;
+    document.getElementById('bannerSummary').textContent =
+      drugList ? `Conflicts with: ${drugList}` : 'Review before adding';
+    banner.style.display = 'block';
+  }
+
+  function hideBanner() {
+    document.getElementById('interactionBanner').style.display = 'none';
+  }
+
+  // ── Detailed preview panel (below form) ───────────────────────────────────
+  function renderPreviewPanel(interactions) {
+    const content = document.getElementById('interactionContent');
+    content.innerHTML = interactions.map(ia => {
+      const c = RISK_COLOR[ia.risk_level] || RISK_COLOR.low;
+      return `<div style="background:${c.bg};border:1px solid ${c.border};border-radius:6px;
+                          padding:12px;margin-bottom:8px">
+        <strong style="color:${c.title}">${ia.drug_a} ↔ ${ia.drug_b}
+          <span style="font-size:.72rem;font-weight:700;margin-left:6px;
+                       padding:1px 7px;border-radius:999px;background:${c.border}">
+            ${ia.risk_level.toUpperCase()}
+          </span>
+        </strong><br>
+        <span style="font-size:.82rem">${ia.interaction_description}</span>
+        ${ia.patient_guidance
+          ? `<br><em style="font-size:.78rem;color:#6b7280">${ia.patient_guidance}</em>`
+          : ''}
+      </div>`;
+    }).join('');
+    document.getElementById('interactionPreview').style.display = 'block';
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  function showModal(interactions) {
+    const level = highestRisk(interactions);
+    const c     = RISK_COLOR[level];
+
+    // Update header colour to match risk
+    const header = document.getElementById('modalHeader');
+    header.style.background   = c.bg;
+    header.style.borderColor  = c.border;
+
+    const count = interactions.length;
+    document.getElementById('modalSubtitle').textContent =
+      `${count} interaction${count > 1 ? 's' : ''} detected — please review before proceeding`;
+
+    let html = `<p style="margin:0 0 16px;font-size:.875rem;color:var(--text-secondary)">
+      Adding <strong>${esc(medInput.value.trim())}</strong> may interact with
+      ${count > 1 ? `<strong>${count}</strong> of your current medications` : 'one of your current medications'}:
+    </p>`;
+
+    interactions.forEach(ia => {
+      const rc = RISK_COLOR[ia.risk_level] || RISK_COLOR.low;
+      const icon = ia.risk_level === 'high' ? 'fa-circle-xmark'
+                 : ia.risk_level === 'medium' ? 'fa-triangle-exclamation' : 'fa-circle-info';
+      html += `<div style="background:${rc.bg};border:1.5px solid ${rc.border};
+                           border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <i class="fa-solid ${icon}" style="color:${rc.title};font-size:.9rem"></i>
+          <span style="font-weight:700;color:${rc.title};font-size:.82rem;text-transform:uppercase">
+            ${ia.risk_level} risk
+          </span>
+          <span style="font-size:.82rem;font-weight:600;color:var(--text)">
+            &nbsp;·&nbsp; ${esc(ia.drug_a)} ↔ ${esc(ia.drug_b)}
+          </span>
+        </div>
+        <div style="font-size:.83rem;color:#374151;margin-bottom:${ia.patient_guidance ? '6px' : '0'}">
+          ${esc(ia.interaction_description)}
+        </div>
+        ${ia.patient_guidance
+          ? `<div style="font-size:.78rem;color:#6b7280;font-style:italic">
+               <i class="fa-solid fa-circle-info"></i> ${esc(ia.patient_guidance)}
+             </div>`
+          : ''}
+      </div>`;
+    });
+
+    if (level === 'high') {
+      html += `<div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:8px;
+                           padding:12px;font-size:.82rem;color:#991b1b;margin-top:4px">
+        <i class="fa-solid fa-hand-raised"></i>
+        <strong>High Risk:</strong> Consult your doctor or pharmacist before adding this medication.
+      </div>`;
+    }
+
+    document.getElementById('modalInteractionContent').innerHTML = html;
+    document.getElementById('interactionModal').style.display = 'flex';
+  }
+
+  window.closeModal = function () {
+    document.getElementById('interactionModal').style.display = 'none';
+  };
+
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — CAPSULE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-card-header">
+      <img src="{{ url_for('static', filename='images/Logo.jpg') }}" alt="CAPSULE Logo">
+      <h1>CAPSULE</h1>
+      <p>AI-Powered Medication Identification</p>
+    </div>
+    <div class="auth-card-body">
+      <h2 style="font-size:1.2rem;font-weight:800;margin:0 0 4px">Welcome back</h2>
+      <p style="color:var(--text-secondary);font-size:.875rem;margin:0 0 24px">
+        Sign in to your healthcare account
+      </p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'danger' if cat == 'error' else cat }}">
+            <i class="fa-solid fa-exclamation-circle"></i> {{ msg }}
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="form-group">
+          <label class="form-label" for="username">
+            <i class="fa-solid fa-user" style="color:var(--primary)"></i> Username or Email
+          </label>
+          <input type="text" id="username" name="username" class="form-control"
+                 placeholder="Enter username or email" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">
+            <i class="fa-solid fa-lock" style="color:var(--primary)"></i> Password
+          </label>
+          <input type="password" id="password" name="password" class="form-control"
+                 placeholder="Enter your password" required>
+        </div>
+
+        <div class="d-flex align-center justify-between mb-3" style="font-size:.875rem">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" name="remember"> Remember me
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100" style="justify-content:center">
+          <i class="fa-solid fa-sign-in-alt"></i> Sign In
+        </button>
+      </form>
+
+      <div class="auth-divider">— or —</div>
+
+      <div style="text-align:center;font-size:.875rem">
+        Don't have an account?
+        <a href="{{ url_for('register') }}" style="font-weight:700">Create Account</a>
+      </div>
+
+      <div style="text-align:center;margin-top:14px;font-size:.8rem;color:var(--text-secondary)">
+        <a href="{{ url_for('index') }}" style="color:var(--text-secondary)">
+          <i class="fa-solid fa-arrow-left"></i> Back to Home
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

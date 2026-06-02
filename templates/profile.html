@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}My Profile — CAPSULE{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="about-page" style="max-width:720px;margin:0 auto">
+
+  <!-- Profile Header -->
+  <div style="background:linear-gradient(135deg,#1e3a8a,#312e81);border-radius:var(--radius);padding:28px 32px;color:#fff;margin-bottom:24px;display:flex;align-items:center;gap:20px">
+    <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;flex-shrink:0">
+      {{ current_user.full_name[0].upper() if current_user.full_name else current_user.username[0].upper() }}
+    </div>
+    <div>
+      <h2 style="margin:0 0 4px;font-size:1.3rem">{{ current_user.full_name or current_user.username }}</h2>
+      <div style="opacity:.8;font-size:.875rem">
+        <span style="background:rgba(255,255,255,.2);padding:2px 12px;border-radius:999px;font-size:.78rem;font-weight:600">
+          {{ current_user.role_label }}
+        </span>
+        {% if current_user.hospital %}
+        &nbsp;·&nbsp; <i class="fa-solid fa-hospital"></i> {{ current_user.hospital }}
+        {% endif %}
+      </div>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div style="font-size:1.6rem;font-weight:800">{{ total_searches or 0 }}</div>
+      <div style="font-size:.75rem;opacity:.8">Total Searches</div>
+    </div>
+  </div>
+
+  <!-- Edit Form -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-user-gear" style="color:var(--primary)"></i> Edit Profile</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('profile') }}">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" value="{{ current_user.username }}" disabled
+                   style="background:var(--bg);cursor:not-allowed">
+            <div style="font-size:.72rem;color:var(--text-secondary);margin-top:2px">Username cannot be changed</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-control"
+                   value="{{ current_user.full_name or '' }}" placeholder="Your full name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ current_user.email or '' }}" placeholder="your@email.com">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Hospital / Institution</label>
+            <input type="text" name="hospital" class="form-control"
+                   value="{{ current_user.hospital or '' }}" placeholder="e.g., King Faisal Hospital">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Specialty / Department</label>
+            <input type="text" name="specialty" class="form-control"
+                   value="{{ current_user.specialty or '' }}" placeholder="e.g., Cardiology">
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:20px 0;padding-top:20px">
+          <h4 style="font-size:.875rem;font-weight:700;margin-bottom:14px;color:var(--text-secondary)">
+            <i class="fa-solid fa-lock"></i> Change Password <span style="font-weight:400">(leave blank to keep current)</span>
+          </h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" name="new_password" class="form-control"
+                     placeholder="Min 6 characters">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm New Password</label>
+              <input type="password" name="confirm_password" class="form-control"
+                     placeholder="Repeat new password">
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-1">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+          </button>
+          <a href="{{ url_for('dashboard') if current_user.role == 'user' else
+                    url_for('patient_dashboard') if current_user.role == 'patient' else
+                    url_for('doctor_dashboard') if current_user.role == 'doctor' else
+                    url_for('pharmacist_dashboard') if current_user.role == 'pharmacist' else
+                    url_for('admin_dashboard') }}" class="btn btn-outline">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Account Info -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> Account Information</h3>
+    </div>
+    <div class="card-body">
+      <table style="width:100%;font-size:.875rem;border-collapse:collapse">
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 0;color:var(--text-secondary);width:40%">Account Status</td>
+          <td style="padding:10px 0">
+            {% if current_user.is_active %}
+            <span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:600">
+              <i class="fa-solid fa-circle-check"></i> Active
+            </span>
+            {% else %}
+            <span style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:600">
+              Inactive
+            </span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 0;color:var(--text-secondary)">Role</td>
+          <td style="padding:10px 0;font-weight:600">{{ current_user.role_label }}</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px 0;color:var(--text-secondary)">Member Since</td>
+          <td style="padding:10px 0">{{ current_user.created_at.strftime('%d %B %Y') if current_user.created_at else '—' }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;color:var(--text-secondary)">Identification Searches</td>
+          <td style="padding:10px 0;font-weight:700;color:var(--primary)">{{ total_searches or 0 }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

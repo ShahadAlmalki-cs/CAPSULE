@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}About CAPSULE{% endblock %}
+{% block page_title %}About CAPSULE{% endblock %}
+
+{% block content %}
+<div class="about-page" style="max-width:800px;margin:0 auto">
+
+  <!-- Hero -->
+  <div style="background:linear-gradient(135deg,#1e3a8a,#312e81);border-radius:var(--radius);padding:40px 36px;color:#fff;margin-bottom:28px;text-align:center">
+    <img src="{{ url_for('static', filename='images/Logo.jpg') }}" alt="CAPSULE"
+         style="width:72px;height:72px;border-radius:50%;border:3px solid rgba(255,255,255,.4);margin-bottom:16px">
+    <h2 style="margin:0 0 8px;font-size:1.75rem;font-weight:900">CAPSULE</h2>
+    <p style="margin:0;opacity:.85;font-size:.95rem">Computer-Aided Pharmaceutical Suggestion and Unified Learning Engine</p>
+    <div style="margin-top:16px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap">
+      <span style="background:rgba(255,255,255,.15);padding:4px 16px;border-radius:999px;font-size:.8rem">
+        <i class="fa-solid fa-university"></i> Taif University
+      </span>
+      <span style="background:rgba(255,255,255,.15);padding:4px 16px;border-radius:999px;font-size:.8rem">
+        <i class="fa-solid fa-flask"></i> AI-Powered
+      </span>
+      <span style="background:rgba(201,160,61,.3);border:1px solid rgba(201,160,61,.5);padding:4px 16px;border-radius:999px;font-size:.8rem">
+        <i class="fa-solid fa-flag"></i> Vision 2030
+      </span>
+    </div>
+  </div>
+
+  <!-- What is CAPSULE -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--primary)"></i> What is CAPSULE?</h3>
+    </div>
+    <div class="card-body" style="font-size:.9rem;line-height:1.8;color:var(--text-secondary)">
+      <p style="margin:0 0 12px">
+          <strong style="color:var(--text-primary)">CAPSULE</strong> is an AI-powered medication identification
+          and management system developed at Taif University as a Senior Capstone Project. It helps doctors,
+          pharmacists, and patients identify medications from text descriptions, check medicine interactions,
+          and manage long-term medication safety.
+      </p>
+      <p style="margin:0">
+          The system uses natural language processing, TF-IDF-based similarity matching, machine learning support,
+          and a curated medication database to provide ranked, context-aware medication suggestions.
+      </p>
+    </div>
+  </div>
+
+  <!-- Key Features -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-star" style="color:var(--warning)"></i> Key Features</h3>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+      {% for icon, title, desc in [
+          ('fa-magnifying-glass-plus', 'Text-Based Medication Identification', 'Describe a medication using plain text such as color, shape, dosage form, or intended use.'),
+          ('fa-robot', 'AI Matching Engine', 'Uses NLP, TF-IDF similarity, and machine learning support to rank the most relevant medication candidates.'),
+          ('fa-triangle-exclamation', 'Interaction Alerts', 'Checks potential medicine interactions and displays clear risk levels for safer decisions.'),
+          ('fa-clock-rotate-left', 'Long-Term Warnings', 'Highlights medications that may require extra attention due to long-term safety considerations.'),
+          ('fa-pills', 'Patient Medication List', 'Allows patients to manage current and previous medications in one place.'),
+          ('fa-user-doctor', 'Role-Based Dashboards', 'Provides dedicated dashboards for patients, doctors, pharmacists, and administrators.'),
+          ('fa-shield-halved', 'Secure Access', 'Supports role-based access control for protected medication information.')
+      ] %}
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:38px;height:38px;border-radius:8px;background:var(--primary-light);
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fa-solid {{ icon }}" style="color:var(--primary)"></i>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:.875rem;margin-bottom:2px">{{ title }}</div>
+            <div style="font-size:.78rem;color:var(--text-secondary);line-height:1.5">{{ desc }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Technology Stack -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-microchip" style="color:var(--secondary)"></i> Technology Stack</h3>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.85rem">
+      {% for layer, items in [
+          ('Backend', 'Python • Flask • SQLAlchemy • SQLite'),
+          ('AI / NLP', 'TF-IDF • NLP Processing • scikit-learn • PyTorch'),
+          ('Matching', 'Text Similarity • Attribute Extraction • Ranking Scores'),
+          ('Frontend', 'HTML5 • CSS3 • Vanilla JS • Font Awesome'),
+          ('Auth', 'Flask-Login • Werkzeug • Role-Based Access Control'),
+          ('Database', 'Curated Medication Database • Medicine Interactions DB')
+      ] %}
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px">
+          <div style="font-weight:700;color:var(--primary);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">{{ layer }}</div>
+          <div style="color:var(--text-secondary)">{{ items }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Links -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="{{ url_for('team') }}" class="btn btn-primary">
+      <i class="fa-solid fa-users"></i> Meet the Team
+    </a>
+    <a href="{{ url_for('identify') }}" class="btn btn-outline">
+      <i class="fa-solid fa-magnifying-glass-plus"></i> Try Medicine Identification
+    </a>
+  </div>
+
+</div>
+{% endblock %}

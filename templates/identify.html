@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+{% block title %}Identify Medication{% endblock %}
+{% block page_title %}Identify Medication{% endblock %}
+
+{% block content %}
+<style>
+  /* Active chip — inline to guarantee no cache issues */
+  .chip.active,
+  .chip[data-active="true"] {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 3px 10px rgba(37,99,235,.5) !important;
+    transform: scale(1.08);
+  }
+  .method-panel { display:none; } .method-panel.active { display:block; }
+  /* Result card */
+  .result-card  { border:1.5px solid var(--border); border-radius:var(--radius); padding:16px;
+                  margin-bottom:12px; transition:box-shadow .2s; background:#fff; }
+  .result-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); }
+  .result-card.top-match { border-color:var(--primary); }
+  .conf-bar-wrap { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; margin-top:6px; }
+  .conf-bar      { height:100%; border-radius:4px; transition:width .7s ease; }
+  /* Medication image container */
+  .med-img-box {
+    flex-shrink:0; border-radius:10px; overflow:hidden;
+    border:1.5px solid var(--border); background:#f8fafc;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .med-img-box img { max-width:100%; max-height:100%; object-fit:contain; padding:6px; }
+  .med-img-placeholder {
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.6rem; font-weight:900; color:#fff; border-radius:8px;
+  }
+  /* Suggestion grid */
+  .suggestion-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+  .suggestion-card {
+    border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px;
+    background:#fff; transition:box-shadow .2s; cursor:default;
+  }
+  .suggestion-card:hover { box-shadow:0 3px 10px rgba(0,0,0,.08); }
+  .sug-img-box {
+    width:100%; height:80px; border-radius:8px; overflow:hidden; margin-bottom:8px;
+    border:1px solid var(--border); background:#f8fafc;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sug-img-box img { max-width:100%; max-height:100%; object-fit:contain; padding:4px; }
+</style>
+
+<!-- Hero Header -->
+<div class="identify-header">
+  <h1><i class="fa-solid fa-magnifying-glass-plus"></i> Identify Medication</h1>
+  <p>Describe the medication in words <strong></strong>  — CAPSULE AI will analyze it.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+
+  <!-- ── Search Form ──────────────────────────────────────────────────────── -->
+  <div>
+    <!-- ── Panel: Describe ── -->
+    <div id="panelDescribe" class="method-panel active">
+      <form id="identifyForm">
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary)"></i> Medication Description</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Describe the medication — صِف الدواء *</label>
+              <textarea id="medicationDesc" class="form-control" rows="4"
+                placeholder="English: small white round tablet for diabetes, twice daily…&#10;عربي: قرص أبيض دائري صغير لعلاج السكري"></textarea>
+              <div style="font-size:.75rem;color:var(--text-secondary);margin-top:4px;display:flex;justify-content:space-between">
+                <span id="charCount">0 characters</span>
+                <span id="langIndicator" style="font-size:.7rem;padding:1px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--border)">EN</span>
+              </div>
+            </div>
+
+            <!-- Color -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-palette" style="color:var(--primary)"></i> Color</label>
+              <select id="colorSelect" class="form-control">
+                <option value="">Select Color</option>
+                <option value="white">White / Cream</option>
+                <option value="yellow">Yellow / Golden</option>
+                <option value="orange">Orange / Peach</option>
+                <option value="pink">Pink / Rose</option>
+                <option value="red">Red</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="purple">Purple / Lavender</option>
+                <option value="brown">Brown / Tan</option>
+                <option value="gray">Gray / Silver</option>
+              </select>
+            </div>
+
+            <!-- Shape -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-shapes" style="color:var(--primary)"></i> Shape</label>
+              <div class="filter-chips">
+                {% for s in ['Round','Oval','Capsule','Square','Hexagonal','Oblong'] %}
+                <span class="chip" data-filter-group="shapes" data-value="{{ s.lower() }}" data-single="true"
+                      onclick="toggleChip(this)">{{ s }}</span>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Packaging -->
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-box" style="color:var(--primary)"></i> Packaging</label>
+              <div class="filter-chips">
+                {% for p in ['Blister Pack','Bottle','Sachet','Ampoule','Vial','Tube','Inhaler'] %}
+                <span class="chip" data-filter-group="packaging" data-value="{{ p.lower() }}" data-single="true"
+                      onclick="toggleChip(this)">{{ p }}</span>
+                {% endfor %}
+              </div>
+            </div>
+
+
+            <script>
+            function toggleChip(el) {
+              var group = el.getAttribute('data-filter-group');
+              var wasOn = el.getAttribute('data-active') === 'true';
+              // Clear all siblings in same group
+              var siblings = document.querySelectorAll('.chip[data-filter-group="' + group + '"]');
+              for (var i = 0; i < siblings.length; i++) {
+                siblings[i].setAttribute('data-active', 'false');
+                siblings[i].style.background = '';
+                siblings[i].style.borderColor = '';
+                siblings[i].style.color = '';
+                siblings[i].style.fontWeight = '';
+                siblings[i].style.boxShadow = '';
+                siblings[i].style.transform = '';
+              }
+              // Toggle clicked chip
+              if (!wasOn) {
+                el.setAttribute('data-active', 'true');
+                el.style.background = '#2563eb';
+                el.style.borderColor = '#2563eb';
+                el.style.color = '#fff';
+                el.style.fontWeight = '700';
+                el.style.boxShadow = '0 3px 10px rgba(37,99,235,.5)';
+                el.style.transform = 'scale(1.08)';
+              }
+            }
+            </script>
+
+            <!-- Actions -->
+            <div class="d-flex gap-1" style="position:sticky;bottom:0;background:#fff;padding:12px 0 4px;border-top:1px solid var(--border);margin-top:12px;z-index:10">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-magnifying-glass"></i> Search
+              </button>
+              <button type="button" id="clearBtn" class="btn btn-outline">
+                <i class="fa-solid fa-xmark"></i> Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" style="display:none;flex-direction:column;align-items:center;padding:40px;gap:12px">
+      <div class="spinner"></div>
+      <span style="color:var(--text-secondary);font-size:.875rem">
+        <i class="fa-solid fa-robot pulse"></i> AI is analyzing…
+      </span>
+    </div>
+
+    <!-- Results Box -->
+    <div id="resultsBox"></div>
+  </div>
+
+  <!-- ── Sidebar Panel ─────────────────────────────────────────────────────── -->
+  <div>
+    <!-- Tips -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-lightbulb" style="color:var(--warning)"></i> Tips / نصائح</h3>
+      </div>
+      <div class="card-body" style="font-size:.85rem">
+        <ul style="margin:0;padding-left:18px;color:var(--text-secondary);line-height:2.1">
+          <li>Include <strong>color</strong> — اللون</li>
+          <li>Include <strong>shape</strong> — الشكل</li>
+          <li>Mention the <strong>disease / use</strong> — الاستخدام</li>
+          <li>Add <strong>form</strong> (tablet, capsule…) — الشكل الدوائي</li>
+          <li>Type in <strong>Arabic or English</strong></li>
+        </ul>
+        <div class="info-box mt-2">
+          <i class="fa-solid fa-circle-info" style="flex-shrink:0"></i>
+          <div>
+            <strong>EN:</strong> <em>"small orange oval tablet for diabetes"</em><br>
+            <strong>عربي:</strong> <em>"قرص بيضاوي برتقالي صغير للسكري"</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Searches -->
+    {% if recent %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--secondary)"></i> Recent Searches</h3>
+      </div>
+      <div class="card-body" style="padding:12px">
+        {% for s in recent %}
+        <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:var(--radius-sm);transition:background .2s"
+             onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+             onclick="document.getElementById('medicationDesc').value='{{ s.description[:60] | replace("'","") }}';switchMethod('describe')">
+          <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            {{ s.description[:45] }}{% if s.description|length > 45 %}…{% endif %}
+          </div>
+          <div style="font-size:.72rem;color:var(--text-secondary);margin-top:2px">
+            {% if s.top_result %}
+              <span style="color:var(--success)">→ {{ s.top_result }}</span>
+              ({{ (s.top_confidence * 100) | round(0) | int }}%)
+            {% endif %}
+            · {{ s.time_ago }}
+          </div>
+        </div>
+        {% endfor %}
+        <div style="padding-top:8px;text-align:center">
+          <a href="{{ url_for('history') }}" style="font-size:.8rem;color:var(--primary)">
+            View all history →
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const form       = document.getElementById('identifyForm');
+  const resultsBox = document.getElementById('resultsBox');
+  const loadingEl  = document.getElementById('loadingIndicator');
+  if (!form) return;
+
+  // ── Colour palette for placeholders ─────────────────────────────────────────
+  const PALETTE = [
+    '#2563eb','#7c3aed','#0d9488','#d97706','#dc2626',
+    '#16a34a','#db2777','#0891b2','#9333ea','#65a30d',
+  ];
+  function placeholderColor(name) {
+    return PALETTE[(name || 'X').charCodeAt(0) % PALETTE.length];
+  }
+
+  // ── Image HTML helpers ───────────────────────────────────────────────────────
+  function imgBox(r, size) {
+    const name  = r.medication || '?';
+    const label = (name[0] || '?').toUpperCase();
+    const color = placeholderColor(name);
+    if (r.image_url) {
+      return `
+        <div class="med-img-box" style="width:${size}px;height:${size}px">
+          <img src="${esc(r.image_url)}" alt="${esc(name)}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="med-img-placeholder"
+               style="display:none;width:100%;height:100%;background:${color}">
+            ${esc(label)}
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="med-img-box" style="width:${size}px;height:${size}px">
+        <div class="med-img-placeholder"
+             style="width:100%;height:100%;background:${color}">
+          ${esc(label)}
+        </div>
+      </div>`;
+  }
+
+  function sugImgBox(r) {
+    const name  = r.medication || '?';
+    const label = (name[0] || '?').toUpperCase();
+    const color = placeholderColor(name);
+    if (r.image_url) {
+      return `
+        <div class="sug-img-box">
+          <img src="${esc(r.image_url)}" alt="${esc(name)}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="med-img-placeholder"
+               style="display:none;width:100%;height:100%;background:${color};border-radius:6px">
+            ${esc(label)}
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="sug-img-box">
+        <div class="med-img-placeholder"
+             style="width:100%;height:100%;background:${color};border-radius:6px">
+          ${esc(label)}
+        </div>
+      </div>`;
+  }
+
+  // ── Card renderers ───────────────────────────────────────────────────────────
+  function renderTopMatch(r) {
+    const conf  = r.confidence_pct || Math.round((r.confidence_score || 0) * 100);
+    const level = conf >= 80 ? 'high' : conf >= 60 ? 'medium' : 'low';
+    const barC  = conf >= 80 ? '#16a34a' : conf >= 60 ? '#d97706' : '#dc2626';
+    return `
+      <div class="result-card top-match mb-3">
+        <div style="display:flex;gap:16px;align-items:flex-start">
+          ${imgBox(r, 130)}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                        gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              <div>
+                <h4 style="margin:0 0 2px;font-size:1.1rem;font-weight:800">${esc(r.medication)}</h4>
+                <span style="font-size:.8rem;color:var(--text-secondary)">${esc(r.generic_name||'')}</span>
+                ${r.strength ? `<span class="detail-tag" style="margin-left:6px;font-size:.75rem">${esc(r.strength)}</span>` : ''}
+              </div>
+              <span class="confidence-badge ${level}" style="white-space:nowrap">${conf}% match</span>
+            </div>
+            <div class="conf-bar-wrap mb-2">
+              <div class="conf-bar" style="width:${conf}%;background:${barC}"></div>
+            </div>
+            <div style="font-size:.8rem;color:var(--text-secondary);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+              ${r.dosage_form ? `<span>Form: <strong>${esc(r.dosage_form)}</strong></span>` : ''}
+              ${r.color       ? `<span>· Color: <strong>${esc(r.color)}</strong></span>`       : ''}
+              ${r.shape       ? `<span>· Shape: <strong>${esc(r.shape)}</strong></span>`       : ''}
+              ${r.category    ? `<span>· ${esc(r.category)}</span>`                            : ''}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {% if current_user.role in ['patient', 'user'] %}
+            <button class="btn btn-success btn-sm confirm-btn"
+            data-name="${esc(r.medication)}"
+            data-drug-id="${r.drug_id || ''}">
+            <i class="fa-solid fa-check"></i> Add to My Medications
+          </button>
+        {% elif current_user.role in ['doctor', 'pharmacist'] %}
+          <button class="btn btn-success btn-sm verify-identification-btn"
+          data-name="${esc(r.medication)}"
+          data-drug-id="${r.drug_id || ''}">
+          <i class="fa-solid fa-check"></i> Confirm Identification
+          </button>
+        {% endif %}
+              ${r.drug_id
+                ? `<a href="/medication/${r.drug_id}" class="btn btn-outline btn-sm">
+                     <i class="fa-solid fa-circle-info"></i> Details
+                   </a>`
+                : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderSuggestion(r) {
+    const conf  = r.confidence_pct || Math.round((r.confidence_score || 0) * 100);
+    const level = conf >= 80 ? 'high' : conf >= 60 ? 'medium' : 'low';
+    return `
+      <div class="suggestion-card"
+           ${r.drug_id ? `onclick="window.location='/medication/${r.drug_id}'"` : ''}>
+        ${sugImgBox(r)}
+        <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;
+                    text-overflow:ellipsis">${esc(r.medication)}</div>
+        <div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:6px;
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${esc(r.generic_name||'')}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+          <span class="confidence-badge ${level}" style="font-size:.68rem">${conf}%</span>
+          ${r.drug_id
+            ? `<a href="/medication/${r.drug_id}" class="btn btn-outline btn-sm"
+                  style="font-size:.7rem;padding:2px 8px"
+                  onclick="event.stopPropagation()">Details</a>`
+            : ''}
+        </div>
+      </div>`;
+  }
+
+  function renderNoMatch(msg) {
+    return `
+      <div class="no-result-box">
+        <div class="no-result-icon">🔍</div>
+        <div class="no-result-title">No exact match found.</div>
+        <div class="no-result-text">${esc(msg || 'Try adding more detail: color, shape, or description.')}</div>
+        <ul style="text-align:left;margin:14px auto 0;max-width:320px;font-size:.85rem;color:var(--text-secondary)">
+          <li>Check spelling in the description.</li>
+          <li>Select color or shape filters.</li>
+          <li>All selected filters must match — try fewer filters.</li>
+        </ul>
+      </div>`;
+  }
+
+  function renderResults(data) {
+    if (!resultsBox) return;
+    resultsBox.innerHTML = '';
+
+    if (!data || data.status === 'no_match' ||
+        !data.results || !data.results.length) {
+      resultsBox.innerHTML = renderNoMatch(data && data.message);
+      return;
+    }
+    if (data.status === 'incomplete') {
+      const missing = (data.completeness && data.completeness.missing) || [];
+      resultsBox.innerHTML = `
+        <div class="no-result-box">
+          <div class="no-result-icon">⚠️</div>
+          <div class="no-result-title">Description incomplete.</div>
+          ${missing.length ? `<ul style="text-align:left;margin:12px auto 0;max-width:320px;font-size:.85rem;color:var(--text-secondary)">
+            ${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}
+        </div>`;
+      return;
+    }
+
+    const [top, ...rest] = data.results;
+    let html = renderTopMatch(top);
+    if (rest.length) {
+      html += `
+        <div class="mt-3">
+          <h5 style="font-size:.88rem;font-weight:700;color:var(--text-secondary);margin-bottom:10px">
+            Other Suggestions
+          </h5>
+          <div class="suggestion-grid">${rest.map(renderSuggestion).join('')}</div>
+        </div>`;
+    }
+    // Matching score disclaimer (Note 12: scores are weighted ensemble matching, not statistical probabilities)
+    html += `
+      <div style="margin-top:12px;padding:8px 12px;background:var(--bg-tertiary,#f8f9fa);border-radius:6px;
+                  font-size:.75rem;color:var(--text-secondary,#6b7280);display:flex;align-items:flex-start;gap:6px">
+        <i class="fa-solid fa-circle-info" style="margin-top:2px;flex-shrink:0"></i>
+        <span>Match scores represent weighted ensemble similarity between your description and the medication database.
+        They are relative ranking scores, not calibrated statistical probabilities. A higher score indicates stronger
+        attribute alignment across multiple AI models.</span>
+      </div>`;
+    resultsBox.innerHTML = html;
+    resultsBox.querySelectorAll('.confirm-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+    const medicationName = btn.dataset.name || '';
+    const drugId = btn.dataset.drugId || '';
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
+
+    try {
+      const response = await fetch('/api/patient/confirm-medication', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          medication_name: medicationName,
+          drug_id: drugId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || 'Could not add medication.');
+      }
+
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Added';
+      btn.style.background = 'var(--success)';
+
+      alert(data.message || 'Medication added to your medication list.');
+
+    } catch (error) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm';
+      alert(error.message || 'Failed to add medication.');
+    }
+  });
+});
+resultsBox.querySelectorAll('.verify-identification-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Identification Confirmed';
+    btn.style.background = 'var(--success)';
+  });
+});
+  }
+
+  // ── Read current filter state ────────────────────────────────────────────────
+  function readFilters() {
+    const shapes      = [...document.querySelectorAll('.chip[data-filter-group="shapes"][data-active="true"]')]
+                          .map(c => c.dataset.value);
+    const packaging   = [...document.querySelectorAll('.chip[data-filter-group="packaging"][data-active="true"]')]
+                          .map(c => c.dataset.value);
+    const colorSel    = document.getElementById('colorSelect');
+    const color       = colorSel ? colorSel.value : '';
+    return { shapes, packaging, color };
+  }
+
+  // ── Core fetch + render ──────────────────────────────────────────────────────
+  async function doSearch(requireDesc) {
+    const textarea = document.getElementById('medicationDesc');
+    const desc     = textarea ? textarea.value.trim() : '';
+    const { shapes, packaging, color } = readFilters();
+
+    const hasFilters = color || shapes.length || packaging.length;
+
+    if (requireDesc && !desc) {
+      resultsBox.innerHTML = `<div class="alert alert-warning">
+        Please enter at least one word in the description field.</div>`;
+      if (textarea) textarea.focus();
+      return;
+    }
+
+    // Nothing to search on — silently clear results
+    if (!desc && !hasFilters) {
+      resultsBox.innerHTML = '';
+      return;
+    }
+
+    // Send description and filters SEPARATELY so the backend can
+    // properly blend AI text score with filter matching score.
+    // Do NOT append filter values to description text.
+    loadingEl.style.display = 'flex';
+    resultsBox.innerHTML    = '';
+
+    try {
+      const resp = await fetch('/api/identify', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          description:  desc,
+          top_k:        5,
+          color:        color,
+          shape:        shapes.length      ? shapes[0]              : '',
+          packaging:    packaging.length   ? packaging[0]           : '',
+          intended_use: '',
+        }),
+      });
+      if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+      renderResults(await resp.json());
+    } catch (err) {
+      resultsBox.innerHTML =
+        `<div class="alert alert-danger">An error occurred. Please try again.</div>`;
+      console.error(err);
+    } finally {
+      loadingEl.style.display = 'none';
+    }
+  }
+
+  // ── Debounced auto-search ────────────────────────────────────────────────────
+  let autoTimer = null;
+  function scheduleAutoSearch(delay) {
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => doSearch(false), delay);
+  }
+
+  // Color select → immediate auto-search + visual highlight
+  const colorSel = document.getElementById('colorSelect');
+  if (colorSel) {
+    colorSel.addEventListener('change', () => {
+      if (colorSel.value) {
+        colorSel.style.borderColor = 'var(--primary)';
+        colorSel.style.background = 'var(--primary-light, #eff6ff)';
+        colorSel.style.fontWeight = '600';
+      } else {
+        colorSel.style.borderColor = '';
+        colorSel.style.background = '';
+        colorSel.style.fontWeight = '';
+      }
+      scheduleAutoSearch(150);
+    });
+  }
+
+  // Chips — main.js processes the toggle first (same bubble phase, registered earlier);
+  // reading state after a 0ms tick guarantees the active class is already updated.
+  document.querySelectorAll(
+    '.chip[data-filter-group="shapes"],' +
+    '.chip[data-filter-group="packaging"]'
+  ).forEach(chip => {
+    chip.addEventListener('click', () => setTimeout(() => scheduleAutoSearch(150), 0));
+  });
+
+  // Clear button — reset all fields, chips, and results
+  const clearBtn = document.getElementById('clearBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      // Clear textarea
+      const ta = document.getElementById('medicationDesc');
+      if (ta) { ta.value = ''; }
+      // Reset color select
+      if (colorSel) {
+        colorSel.value = '';
+        colorSel.style.borderColor = '';
+        colorSel.style.background = '';
+        colorSel.style.fontWeight = '';
+      }
+      // Deactivate all chips
+      document.querySelectorAll('.chip[data-active="true"]').forEach(chip => {
+        chip.setAttribute('data-active', 'false');
+        chip.style.background = '';
+        chip.style.borderColor = '';
+        chip.style.color = '';
+        chip.style.fontWeight = '';
+        chip.style.boxShadow = '';
+        chip.style.transform = '';
+      });
+      // Clear results and char count
+      resultsBox.innerHTML = '';
+      const charCount = document.getElementById('charCount');
+      if (charCount) charCount.textContent = '0 characters';
+    });
+  }
+
+  // Textarea — debounce typing
+  const textarea = document.getElementById('medicationDesc');
+  if (textarea) {
+    const charCount = document.getElementById('charCount');
+    textarea.addEventListener('input', () => {
+      if (charCount) charCount.textContent = textarea.value.length + ' characters';
+      scheduleAutoSearch(600);
+    });
+  }
+
+  // ── Manual submit (capture phase) ───────────────────────────────────────────
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    clearTimeout(autoTimer);
+    doSearch(true);
+  }, true);
+
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+{% endblock %}

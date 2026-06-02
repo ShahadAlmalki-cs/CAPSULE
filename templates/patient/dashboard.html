@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+{% block title %}My Health Dashboard — CAPSULE{% endblock %}
+{% block page_title %}My Health Dashboard{% endblock %}
+
+{% block content %}
+<style>
+  .risk-high   { background:#fef2f2; border-color:#fca5a5; }
+  .risk-medium { background:#fffbeb; border-color:#fcd34d; }
+  .risk-low    { background:#eff6ff; border-color:#93c5fd; }
+  .risk-badge-high   { background:#dc2626; color:#fff; }
+  .risk-badge-medium { background:#d97706; color:#fff; }
+  .risk-badge-low    { background:#2563eb; color:#fff; }
+  .med-tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
+  .med-tag.current  { background:#dcfce7; color:#166534; }
+  .med-tag.previous { background:#f3f4f6; color:#6b7280; }
+  .interaction-card { border:1.5px solid; border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+  .longterm-card    { border:1.5px solid #fcd34d; border-radius:var(--radius); padding:16px; margin-bottom:12px; background:#fffbeb; }
+  .stat-val { font-size:2rem; font-weight:800; color:var(--primary); }
+  .quick-identify-box { background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:var(--radius); padding:24px; color:#fff; }
+</style>
+
+<!-- Welcome Banner -->
+<div style="background:linear-gradient(135deg,#1e3a8a,#312e81);border-radius:var(--radius);padding:28px 32px;color:#fff;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+  <div>
+    <h2 style="margin:0;font-size:1.5rem"><i class="fa-solid fa-user-circle"></i>
+      Welcome, {{ current_user.full_name or current_user.username }}
+    </h2>
+    <p style="margin:4px 0 0;opacity:.85;font-size:.9rem">
+      <i class="fa-solid fa-pills"></i> {{ current_meds|length }} active medication{{ 's' if current_meds|length != 1 }}
+      {% if interactions %} &nbsp;·&nbsp; <span style="color:#fca5a5;font-weight:700">{{ interactions|length }} interaction alert{{ 's' if interactions|length != 1 }}</span>{% endif %}
+    </p>
+  </div>
+  <button onclick="openAddMedModal()" class="btn btn-primary" style="background:#fff;color:var(--primary)">
+    <i class="fa-solid fa-plus"></i> Add Medication
+  </button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+
+  <!-- ── LEFT COLUMN ── -->
+  <div>
+
+    <!-- Interaction Alerts -->
+    {% if interactions %}
+    <div class="card mb-3">
+      <div class="card-header" style="background:#fef2f2;border-bottom-color:#fca5a5">
+        <h3 class="card-title" style="color:#991b1b">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Medicine Interaction Alerts ({{ interactions|length }})
+        </h3>
+      </div>
+      <div class="card-body" style="padding:16px">
+        {% for ia in interactions %}
+        <div class="interaction-card risk-{{ ia.risk_level }}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+            <div>
+              <span class="med-tag current" style="font-size:.8rem">{{ ia.drug_a }}</span>
+              <i class="fa-solid fa-plus" style="color:var(--text-secondary);margin:0 6px;font-size:.7rem"></i>
+              <span class="med-tag current" style="font-size:.8rem">{{ ia.drug_b }}</span>
+            </div>
+            <span class="risk-badge-{{ ia.risk_level }}" style="padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700">
+              <i class="fa-solid {{ ia.badge.icon }}"></i> {{ ia.badge.label }}
+            </span>
+          </div>
+          <p style="margin:10px 0 6px;font-size:.875rem;font-weight:600">{{ ia.interaction_description }}</p>
+          {% if ia.patient_guidance %}
+          <div style="background:rgba(0,0,0,.04);border-radius:6px;padding:10px;font-size:.82rem">
+            <p style="margin:0 0 6px;color:var(--text-secondary)">
+              <i class="fa-solid fa-circle-info"></i> <strong>What to do:</strong> {{ ia.patient_guidance }}
+            </p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              {% if ia.risk_level == 'high' %}
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+                           font-size:.73rem;font-weight:600;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626">
+                <i class="fa-solid fa-phone"></i> Contact your doctor immediately
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+                           font-size:.73rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9">
+                <i class="fa-solid fa-pills"></i> Alert your pharmacist
+              </span>
+              {% elif ia.risk_level == 'medium' %}
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+                           font-size:.73rem;font-weight:600;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8">
+                <i class="fa-solid fa-user-doctor"></i> Discuss with your doctor
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+                           font-size:.73rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9">
+                <i class="fa-solid fa-pills"></i> Ask your pharmacist
+              </span>
+              {% else %}
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+                           font-size:.73rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9">
+                <i class="fa-solid fa-pills"></i> Mention to your pharmacist
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Long-Term Warnings -->
+    {% if long_term_notices %}
+    <div class="card mb-3">
+      <div class="card-header" style="background:#fffbeb;border-bottom-color:#fcd34d">
+        <h3 class="card-title" style="color:#92400e">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          Long-Term Use Notices ({{ long_term_notices|length }})
+        </h3>
+      </div>
+      <div class="card-body" style="padding:16px">
+        {% for m in long_term_notices %}
+        {% set w = m.long_term_info %}
+        <div class="longterm-card">
+          <div style="margin-bottom:8px">
+            <strong style="font-size:.9rem">{{ m.medication_name }}</strong>
+            <span style="background:#d97706;color:#fff;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:700;margin-left:8px">LONG-TERM</span>
+          </div>
+          {% if w %}
+          {% if w.effect_summary %}
+          <p style="font-weight:700;font-size:.82rem;margin:0 0 6px">{{ w.effect_summary }}</p>
+          {% endif %}
+          <p style="margin:0 0 8px;font-size:.8rem;color:var(--text-secondary);line-height:1.6">{{ w.description }}</p>
+          {% if w.duration %}
+          <p style="font-size:.78rem;margin:0 0 8px">
+            <i class="fa-solid fa-calendar-days" style="color:#d97706"></i>
+            Duration concern: <strong>{{ w.duration }}</strong>
+          </p>
+          {% endif %}
+          {% if w.monitoring %}
+          <p style="font-size:.78rem;font-weight:700;margin:0 0 4px">Monitoring required:</p>
+          <ul style="margin:0 0 8px;padding-left:18px">
+            {% for item in w.monitoring %}
+            <li style="font-size:.78rem;color:var(--text-secondary)">{{ item }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if w.warning %}
+          <div style="background:rgba(0,0,0,.05);border-radius:6px;padding:8px;font-size:.8rem">
+            <i class="fa-solid fa-hand-holding-medical" style="color:#d97706"></i>
+            <strong> What to do:</strong> {{ w.warning }}
+          </div>
+          {% endif %}
+          {% else %}
+          <p style="margin:0;font-size:.82rem;color:var(--text-secondary)">Monitor for long-term effects. Consult your healthcare provider.</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Current Medications -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-pills" style="color:var(--primary)"></i> Current Medications</h3>
+        <a href="{{ url_for('patient_medications') }}" style="font-size:.8rem;color:var(--primary)">View all →</a>
+      </div>
+      {% if current_meds %}
+      <div class="card-body" style="padding:0">
+        <table class="table" style="margin:0">
+          <thead>
+            <tr>
+              <th>Medication</th>
+              <th>Dosage</th>
+              <th>Since</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for med in current_meds[:8] %}
+            <tr>
+              <td>
+                <strong>{{ med.medication_name }}</strong>
+                {% if med.long_term_flag %}
+                <span title="Long-term use warning" style="color:#d97706;margin-left:4px"><i class="fa-solid fa-clock"></i></span>
+                {% endif %}
+              </td>
+              <td style="font-size:.82rem;color:var(--text-secondary)">{{ med.dosage or '—' }}</td>
+              <td style="font-size:.82rem;color:var(--text-secondary)">
+                {{ med.start_date.strftime('%d %b %Y') if med.start_date else '—' }}
+              </td>
+              <td style="text-align:right">
+                <a href="{{ url_for('patient_medications') }}" class="btn btn-outline" style="padding:3px 10px;font-size:.75rem">Manage</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary)">
+        <i class="fa-solid fa-pills" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:12px"></i>
+        <p style="margin:0 0 16px">No medications added yet.</p>
+        <button onclick="openAddMedModal()" class="btn btn-primary">
+          <i class="fa-solid fa-plus"></i> Add Your First Medication
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT SIDEBAR ── -->
+  <div>
+    <!-- Stats -->
+    <div class="card mb-3">
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:center">
+        <div>
+          <div class="stat-val">{{ current_meds|length }}</div>
+          <div style="font-size:.78rem;color:var(--text-secondary)">Active Meds</div>
+        </div>
+        <div>
+          <div class="stat-val" style="color:{% if interactions %}#dc2626{% else %}#16a34a{% endif %}">{{ interactions|length }}</div>
+          <div style="font-size:.78rem;color:var(--text-secondary)">Interactions</div>
+        </div>
+        <div>
+          <div class="stat-val" style="color:#d97706">{{ long_term_notices|length }}</div>
+          <div style="font-size:.78rem;color:var(--text-secondary)">LT Warnings</div>
+        </div>
+        <div>
+          <div class="stat-val" style="color:var(--secondary)">{{ prev_meds|length }}</div>
+          <div style="font-size:.78rem;color:var(--text-secondary)">Previous</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Identify -->
+    <div class="quick-identify-box mb-3">
+      <h4 style="margin:0 0 8px;font-size:1rem"><i class="fa-solid fa-magnifying-glass-plus"></i> Quick Identify</h4>
+      <p style="font-size:.82rem;opacity:.85;margin:0 0 14px">Unsure about a pill? Use CAPSULE AI to identify it.</p>
+      <a href="{{ url_for('identify') }}" class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);width:100%;justify-content:center">
+        Identify a Medication →
+      </a>
+    </div>
+
+    <!-- Safety Tips -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-shield-heart" style="color:var(--secondary)"></i> Safety Tips</h3>
+      </div>
+      <div class="card-body" style="font-size:.82rem;color:var(--text-secondary)">
+        <ul style="margin:0;padding-left:18px;line-height:2.2">
+          <li>Keep your medication list up to date</li>
+          <li>Never stop prescription meds without advice</li>
+          <li>Report side effects to your doctor</li>
+          <li>Store medications as directed on the label</li>
+          <li>Check interactions before starting new meds</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     ADD MEDICATION MODAL — with real-time drug interaction checking
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="addMedModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+            z-index:600;align-items:center;justify-content:center;padding:16px"
+     onclick="if(event.target===this)closeAddMedModal()">
+
+  <div style="background:#fff;border-radius:var(--radius);width:100%;max-width:620px;
+              max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);
+              position:relative;display:flex;flex-direction:column">
+
+    <!-- Modal header -->
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+                position:sticky;top:0;background:#fff;z-index:1">
+      <div>
+        <h3 style="margin:0;font-size:1.05rem;font-weight:800">
+          <i class="fa-solid fa-plus-circle" style="color:var(--primary)"></i> Add New Medication
+        </h3>
+        <p style="margin:2px 0 0;font-size:.75rem;color:var(--text-secondary)">
+          Interactions with your current medications are checked in real time
+        </p>
+      </div>
+      <button onclick="closeAddMedModal()"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;
+                     color:var(--text-secondary);padding:4px 8px;border-radius:6px;
+                     line-height:1">&times;</button>
+    </div>
+
+    <!-- Modal body -->
+    <div style="padding:20px 24px">
+      <form method="POST" action="{{ url_for('add_patient_medication') }}" id="dashAddMedForm">
+
+        <!-- Medication name -->
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" style="font-weight:700">
+            Medication Name <span style="color:#dc2626">*</span>
+          </label>
+          <input type="text" name="medication_name" id="dashMedName" class="form-control"
+                 placeholder="e.g., Metformin, Aspirin, Amlodipine…"
+                 required autocomplete="off" list="dashDrugList"
+                 style="font-size:.95rem">
+          <datalist id="dashDrugList">
+            {% for d in drugs %}
+            <option value="{{ d.drug_name }}">
+            {% endfor %}
+          </datalist>
+          <div style="font-size:.72rem;color:var(--text-secondary);margin-top:3px">
+            Start typing — interactions are checked automatically
+          </div>
+        </div>
+
+        <!-- Dosage + Status -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label" style="font-weight:700">Dosage</label>
+            <input type="text" name="dosage" class="form-control"
+                   placeholder="e.g., 500mg twice daily">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label" style="font-weight:700">Status</label>
+            <select name="status" id="dashMedStatus" class="form-control">
+              <option value="current" selected>Current (taking now)</option>
+              <option value="previous">Previous / Stopped</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Start date + Prescribed by -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label" style="font-weight:700">Start Date</label>
+            <input type="date" name="start_date" id="dashStartDate" class="form-control">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label" style="font-weight:700">Prescribed By</label>
+            <input type="text" name="prescribed_by" class="form-control"
+                   placeholder="Doctor's name or clinic">
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-label" style="font-weight:700">Notes</label>
+          <textarea name="notes" class="form-control" rows="2"
+                    placeholder="Side effects, reminders, etc."></textarea>
+        </div>
+
+        <!-- ── Interaction Check Panel ─────────────────────────────────────── -->
+        <div id="interactPanel" style="display:none;margin-bottom:18px">
+
+          <!-- Loading -->
+          <div id="interactLoading"
+               style="display:none;background:#f8fafc;border:1.5px solid var(--border);
+                      border-radius:var(--radius-sm);padding:14px;
+                      align-items:center;gap:10px;font-size:.82rem;color:var(--text-secondary)">
+            <i class="fa-solid fa-spinner fa-spin" style="color:var(--primary)"></i>
+            Checking for drug interactions…
+          </div>
+
+          <!-- No interactions -->
+          <div id="interactNone"
+               style="display:none;background:#f0fdf4;border:1.5px solid #86efac;
+                      border-radius:var(--radius-sm);padding:14px;
+                      align-items:center;gap:10px;font-size:.84rem;color:#166534">
+            <i class="fa-solid fa-shield-heart" style="font-size:1.2rem;flex-shrink:0"></i>
+            <div>
+              <strong>No interactions found.</strong>
+              No known conflicts with your current medications.
+            </div>
+          </div>
+
+          <!-- Interactions found -->
+          <div id="interactFound" style="display:none">
+            <div id="interactHeader"
+                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;
+                        border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+                        border-width:1.5px;border-style:solid;border-bottom:none">
+              <i class="fa-solid fa-triangle-exclamation" style="font-size:1.1rem;flex-shrink:0"></i>
+              <div>
+                <div style="font-weight:800;font-size:.88rem" id="interactTitle"></div>
+                <div style="font-size:.74rem;margin-top:2px" id="interactSubtitle"></div>
+              </div>
+            </div>
+            <div id="interactList"
+                 style="border-width:1.5px;border-style:solid;border-top:none;
+                        border-radius:0 0 var(--radius-sm) var(--radius-sm);
+                        padding:12px 14px">
+            </div>
+          </div>
+
+          <!-- High-risk acknowledgment checkbox -->
+          <div id="interactAck"
+               style="display:none;margin-top:12px;background:#fef2f2;
+                      border:2px solid #fca5a5;border-radius:var(--radius-sm);padding:14px">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+              <input type="checkbox" id="ackCheckbox"
+                     style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:#dc2626"
+                     onchange="updateSubmitBtn()">
+              <span style="font-size:.82rem;color:#991b1b;line-height:1.5">
+                <strong><i class="fa-solid fa-exclamation-triangle"></i>
+                  I acknowledge the HIGH RISK interaction above.</strong><br>
+                I understand these medications have a serious known conflict and will
+                <strong>consult my doctor or pharmacist</strong> before taking them together.
+              </span>
+            </label>
+          </div>
+
+        </div>
+        <!-- ── end Interaction Check Panel ─────────────────────────────────── -->
+
+        <!-- Footer buttons -->
+        <div style="display:flex;gap:10px;justify-content:flex-end;
+                    padding-top:16px;border-top:1px solid var(--border)">
+          <button type="button" class="btn btn-outline" onclick="closeAddMedModal()">
+            Cancel
+          </button>
+          <button type="submit" id="dashSubmitBtn" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Add Medication
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ── helpers ──────────────────────────────────────────────────────────── */
+  const $  = id => document.getElementById(id);
+  function show(id, disp) { const e=$(''+id); if(e) e.style.display = disp||''; }
+  function hide(id)        { const e=$(''+id); if(e) e.style.display = 'none'; }
+  function flex(id)        { const e=$(''+id); if(e) e.style.display = 'flex'; }
+  function escH(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function applyBox(id, bg, bc, col) {
+    const e = $(id); if (!e) return;
+    e.style.background   = bg;
+    e.style.borderColor  = bc;
+    if (col) e.style.color = col;
+  }
+
+  /* ── state ────────────────────────────────────────────────────────────── */
+  let checkTimer  = null;
+  let hasHighRisk = false;
+
+  /* ── open / close ─────────────────────────────────────────────────────── */
+  window.openAddMedModal = function () {
+    $('addMedModal').style.display = 'flex';
+    $('dashMedName').value = '';
+    $('dashStartDate').value = new Date().toISOString().slice(0,10);
+    resetPanel();
+    setTimeout(() => $('dashMedName').focus(), 60);
+  };
+
+  window.closeAddMedModal = function () {
+    $('addMedModal').style.display = 'none';
+    clearTimeout(checkTimer);
+  };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('addMedModal').style.display === 'flex')
+      closeAddMedModal();
+  });
+
+  /* ── input listeners ──────────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', function () {
+    ['input','change'].forEach(ev =>
+      $('dashMedName').addEventListener(ev, schedule));
+    $('dashMedStatus').addEventListener('change', schedule);
+  });
+
+  function schedule() {
+    clearTimeout(checkTimer);
+    resetPanel();
+    const name   = $('dashMedName').value.trim();
+    const status = $('dashMedStatus').value;
+    if (name.length < 2 || status !== 'current') {
+      updateSubmitBtn(); return;
+    }
+    showLoading();
+    checkTimer = setTimeout(() => doCheck(name), 650);
+  }
+
+  /* ── API call ─────────────────────────────────────────────────────────── */
+  function doCheck(newDrug) {
+    fetch('/api/patient/check-interactions', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ new_drug: newDrug })
+    })
+    .then(r => r.json())
+    .then(d => renderResults(d.interactions || [], d.highest_risk || 'none'))
+    .catch(() => { hide('interactPanel'); updateSubmitBtn(); });
+  }
+
+  /* ── panel states ─────────────────────────────────────────────────────── */
+  function resetPanel() {
+    hasHighRisk = false;
+    hide('interactPanel');
+    hide('interactLoading');
+    hide('interactNone');
+    hide('interactFound');
+    hide('interactAck');
+    $('interactList').innerHTML = '';
+    if ($('ackCheckbox')) $('ackCheckbox').checked = false;
+  }
+
+  function showLoading() {
+    show('interactPanel');
+    flex('interactLoading');
+    hide('interactNone');
+    hide('interactFound');
+    hide('interactAck');
+  }
+
+  /* ── render results ───────────────────────────────────────────────────── */
+  function renderResults(interactions, highest) {
+    hide('interactLoading');
+    show('interactPanel');
+
+    if (!interactions.length) {
+      flex('interactNone');
+      hide('interactFound'); hide('interactAck');
+      hasHighRisk = false;
+      updateSubmitBtn(); return;
+    }
+
+    hasHighRisk = highest === 'high';
+
+    /* header style */
+    const STYLE = {
+      high:   { bg:'#fef2f2', bc:'#fca5a5', col:'#991b1b',
+                title: interactions.length + ' HIGH RISK Interaction' + (interactions.length!==1?'s':'') + ' Detected',
+                sub:   'These medications have serious known conflicts — review carefully before proceeding.' },
+      medium: { bg:'#fffbeb', bc:'#fcd34d', col:'#92400e',
+                title: interactions.length + ' Moderate Interaction' + (interactions.length!==1?'s':'') + ' Found',
+                sub:   'Discuss these with your doctor or pharmacist before taking together.' },
+      low:    { bg:'#eff6ff', bc:'#93c5fd', col:'#1e40af',
+                title: interactions.length + ' Low-Risk Interaction' + (interactions.length!==1?'s':'') + ' Noted',
+                sub:   'Low-level interactions — mention to your pharmacist.' },
+    };
+    const s = STYLE[highest] || STYLE.low;
+    applyBox('interactHeader', s.bg, s.bc, s.col);
+    applyBox('interactList',   s.bg, s.bc);
+    $('interactTitle').textContent   = s.title;
+    $('interactTitle').style.color   = s.col;
+    $('interactSubtitle').textContent = s.sub;
+    $('interactSubtitle').style.color = s.col;
+
+    /* interaction cards */
+    const RISK = {
+      high:   { bg:'#fef2f2', bc:'#fca5a5', fc:'#dc2626', tc:'#991b1b', icon:'fa-triangle-exclamation', lbl:'HIGH RISK' },
+      medium: { bg:'#fffbeb', bc:'#fcd34d', fc:'#d97706', tc:'#92400e', icon:'fa-circle-exclamation',   lbl:'MODERATE'  },
+      low:    { bg:'#eff6ff', bc:'#93c5fd', fc:'#2563eb', tc:'#1e40af', icon:'fa-circle-info',          lbl:'LOW RISK'  },
+    };
+
+    const CHIPS = {
+      high:   `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:600;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;margin-right:5px"><i class="fa-solid fa-phone"></i> Contact your doctor immediately</span>
+               <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9"><i class="fa-solid fa-pills"></i> Alert your pharmacist</span>`,
+      medium: `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:600;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;margin-right:5px"><i class="fa-solid fa-user-doctor"></i> Discuss with your doctor</span>
+               <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9"><i class="fa-solid fa-pills"></i> Ask your pharmacist</span>`,
+      low:    `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:600;background:#f5f3ff;border:1px solid #c4b5fd;color:#6d28d9"><i class="fa-solid fa-pills"></i> Mention to your pharmacist</span>`,
+    };
+
+    let html = '';
+    interactions.forEach(ia => {
+      const r = RISK[ia.risk_level] || RISK.low;
+      html += `
+        <div style="background:#fff;border:1.5px solid ${r.bc};border-radius:8px;padding:12px 14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-weight:700;font-size:.875rem">
+              <span style="color:${r.tc}">${escH(ia.drug_a)}</span>
+              <span style="color:#94a3b8;margin:0 8px;font-size:.75rem"><i class="fa-solid fa-arrow-right-arrow-left"></i></span>
+              <span style="color:${r.tc}">${escH(ia.drug_b)}</span>
+            </span>
+            <span style="background:${r.fc};color:#fff;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:700;white-space:nowrap">
+              <i class="fa-solid ${r.icon}"></i> ${r.lbl}
+            </span>
+          </div>
+          <p style="margin:0 0 10px;font-size:.82rem;color:#475569;line-height:1.55">${escH(ia.interaction_description)}</p>
+          ${ia.patient_guidance ? `
+          <div style="background:rgba(0,0,0,.04);border-radius:6px;padding:10px 12px;margin-bottom:10px">
+            <p style="margin:0 0 5px;font-size:.76rem;font-weight:700;color:${r.tc}"><i class="fa-solid fa-circle-info"></i> What to do:</p>
+            <p style="margin:0;font-size:.78rem;color:#475569">${escH(ia.patient_guidance)}</p>
+          </div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${CHIPS[ia.risk_level]||CHIPS.low}</div>
+        </div>`;
+    });
+
+    $('interactList').innerHTML = html;
+    show('interactFound');
+    hide('interactNone');
+
+    if (hasHighRisk) { show('interactAck'); $('ackCheckbox').checked = false; }
+    else              { hide('interactAck'); }
+
+    updateSubmitBtn();
+  }
+
+  /* ── submit button ────────────────────────────────────────────────────── */
+  window.updateSubmitBtn = function () {
+    const btn = $('dashSubmitBtn');
+    if (!btn) return;
+    const blocked = hasHighRisk && !($('ackCheckbox') && $('ackCheckbox').checked);
+    btn.disabled       = blocked;
+    btn.style.opacity  = blocked ? '.45' : '1';
+    btn.style.cursor   = blocked ? 'not-allowed' : '';
+    btn.title          = blocked
+      ? 'Please tick the acknowledgment checkbox above to continue.'
+      : '';
+  };
+
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% block title %}Pharmacist Dashboard{% endblock %}
+{% block page_title %}Pharmacist Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.disease-group-btn:hover { background:#f9fafb!important; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08)!important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div style="background:linear-gradient(135deg,#065f46,#0d9488);border-radius:var(--radius);padding:28px 32px;color:#fff;margin-bottom:28px;display:flex;align-items:center;gap:16px">
+  <div style="width:56px;height:56px;background:rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">
+    <i class="fa-solid fa-pills"></i>
+  </div>
+  <div style="flex:1">
+    <h2 style="margin:0 0 4px;font-weight:800">{{ current_user.full_name or current_user.username }}</h2>
+    <p style="margin:0;opacity:.85;font-size:.875rem">
+      Clinical Pharmacist · {{ current_user.hospital or 'Pharmacy' }}
+    </p>
+  </div>
+  <a href="{{ url_for('identify') }}" class="btn btn-sm"
+     style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4)">
+    <i class="fa-solid fa-magnifying-glass-plus"></i> Identify Medication
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fa-solid fa-pills"></i></div>
+    <div>
+      <div class="stat-value" data-target="{{ total_drugs }}">{{ total_drugs }}</div>
+      <div class="stat-label">Total Medications</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fa-solid fa-layer-group"></i></div>
+    <div>
+      <div class="stat-value">{{ disease_groups|length }}</div>
+      <div class="stat-label">Therapeutic Groups</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="fa-solid fa-magnifying-glass"></i></div>
+    <div>
+      <div class="stat-value">AI</div>
+      <div class="stat-label">Powered Search</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fa-solid fa-shield-halved"></i></div>
+    <div>
+      <div class="stat-value">Reference</div>
+      <div class="stat-label">Medication Data</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Drug Interaction Quick-Checker -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:#dc2626"></i> Drug Interaction Checker</h3>
+    <span style="font-size:.75rem;color:var(--text-secondary)">Check any two medicines for known interactions</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:180px">
+        <label class="form-label" style="font-size:.8rem">Drug A</label>
+        <input id="intDrugA" class="form-control" placeholder="e.g. Warfarin">
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label class="form-label" style="font-size:.8rem">Drug B</label>
+        <input id="intDrugB" class="form-control" placeholder="e.g. Ibuprofen">
+      </div>
+      <button class="btn btn-primary" onclick="checkInteraction()" style="height:42px">
+        <i class="fa-solid fa-search"></i> Check
+      </button>
+    </div>
+    <div id="interactionResult" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- Search & Filter -->
+<div class="card mb-4" id="medicine-database-section">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-search" style="color:var(--primary)"></i> Search Medicine Database</h3>
+    <span id="drugCount" style="font-size:.8rem;color:var(--text-secondary)">{{ total_drugs }} medicines</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <div style="flex:1;min-width:200px">
+        <input type="text" id="drugSearchInput" class="form-control"
+               placeholder="Search by name, generic, or category… | ابحث بالاسم أو المادة الفعالة…">
+      </div>
+      <div style="min-width:160px">
+        <select id="categoryFilter" class="form-control">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+            {% if cat[0] %}
+            <option value="{{ cat[0] }}">{{ cat[0] }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <button type="button" id="drugSearchBtn" class="btn btn-primary"
+                style="height:42px;padding:0 24px;display:flex;align-items:center;gap:8px;font-weight:600;white-space:nowrap">
+          <i class="fa-solid fa-magnifying-glass"></i> Search
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Drug Grid -->
+<div id="drugContainer" class="drug-grid">
+  {% for drug in drugs %}
+  <div class="drug-card" onclick="window.location='{{ url_for('medication_detail', med_id=drug.id) }}'">
+    <div class="drug-card-name">{{ drug.display_name }}</div>
+    <div class="drug-card-generic">{{ drug.generic_name }}</div>
+    <div class="drug-card-tags">
+      {% if drug.dosage_form %}
+        <span class="drug-tag">{{ drug.dosage_form }}</span>
+      {% endif %}
+      {% if drug.strength_label %}
+        <span class="drug-tag">{{ drug.strength_label }}</span>
+      {% endif %}
+      {% if drug.category %}
+        <span class="drug-tag" style="background:#ede9fe;color:#5b21b6">{{ drug.category[:20] }}</span>
+      {% endif %}
+      {% if drug.legal_class %}
+        <span class="drug-tag" style="background:#{{ 'fee2e2' if drug.legal_class == 'prescription' else 'd1fae5' }};color:#{{ '991b1b' if drug.legal_class == 'prescription' else '065f46' }}">
+          {{ drug.legal_class | capitalize }}
+        </span>
+      {% endif %}
+    </div>
+    {% if drug.price %}
+    <div style="font-size:.72rem;color:var(--text-secondary);margin-top:6px">
+      <i class="fa-solid fa-tag"></i> SAR {{ drug.price }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Drugs by Disease Category -->
+<div class="card mb-4" style="margin-top:28px">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-layer-group" style="color:var(--secondary)"></i> Drugs by Disease Category</h3>
+    <span style="font-size:.75rem;color:var(--text-secondary)">{{ disease_groups|length }} therapeutic groups</span>
+  </div>
+  <div class="card-body" style="padding:16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+      {% for g in disease_groups %}
+      <button class="disease-group-btn" data-idx="{{ loop.index0 }}"
+              onclick="toggleDiseaseGroup({{ loop.index0 }})"
+              style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:14px 12px;cursor:pointer;
+                     text-align:left;transition:all .2s;display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+                    font-size:.95rem;color:#fff;background:{{ g.color }};flex-shrink:0">
+          <i class="fa-solid {{ g.icon }}"></i>
+        </div>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:.82rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</div>
+          <div style="font-size:.72rem;color:var(--text-secondary)">{{ g.drug_count }} drug{{ 's' if g.drug_count != 1 }}</div>
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+    <div id="catDrugList" style="display:none">
+      <div id="catGroupTitle" style="font-weight:700;font-size:.95rem;margin-bottom:10px;display:flex;align-items:center;gap:8px"></div>
+      <div id="catDrugGrid" class="drug-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Drug Detail Modal (quick view) -->
+<div id="drugModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:var(--radius);padding:28px;max-width:480px;width:100%;box-shadow:var(--shadow-lg);position:relative">
+    <button onclick="document.getElementById('drugModal').style.display='none'"
+            style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-secondary)">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div id="drugModalContent"></div>
+  </div>
+</div>
+
+<script>
+// ── Drug Interaction Checker ──────────────────────────────────────────────────
+async function checkInteraction() {
+  const a = document.getElementById('intDrugA').value.trim();
+  const b = document.getElementById('intDrugB').value.trim();
+  const box = document.getElementById('interactionResult');
+  if (!a || !b) {
+    box.innerHTML = '<div class="alert alert-warning">Please enter both drug names.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/patient/check-interactions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({medication_names: [a, b]}),
+    });
+    const data = await resp.json();
+    if (!data.interactions || !data.interactions.length) {
+      box.innerHTML = '<div class="alert alert-success"><i class="fa-solid fa-circle-check"></i> No known interaction found between <strong>' + escHtml(a) + '</strong> and <strong>' + escHtml(b) + '</strong>.</div>';
+      return;
+    }
+    const colors = {high:'#fef2f2', medium:'#fffbeb', low:'#eff6ff'};
+    const border = {high:'#fca5a5', medium:'#fcd34d', low:'#93c5fd'};
+    const badge  = {high:'#dc2626', medium:'#d97706', low:'#2563eb'};
+    box.innerHTML = data.interactions.map(ia => `
+      <div style="background:${colors[ia.risk_level]};border:1.5px solid ${border[ia.risk_level]};
+                  border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:.9rem">${escHtml(ia.drug_a)} + ${escHtml(ia.drug_b)}</strong>
+          <span style="background:${badge[ia.risk_level]};color:#fff;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:700">
+            ${ia.risk_level.toUpperCase()} RISK
+          </span>
+        </div>
+        <p style="margin:8px 0 4px;font-size:.85rem">${escHtml(ia.interaction_description)}</p>
+        <div style="font-size:.8rem;color:var(--text-secondary)">
+          <i class="fa-solid fa-circle-info"></i> ${escHtml(ia.patient_guidance)}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    box.innerHTML = '<div class="alert alert-danger">Error checking interactions.</div>';
+  }
+}
+
+// ── Disease Group Filter ──────────────────────────────────────────────────────
+const DISEASE_GROUPS = {{ disease_groups | default([]) | tojson }};
+let activeGroupIdx = null;
+async function toggleDiseaseGroup(idx) {
+  const listEl = document.getElementById('catDrugList');
+  const titleEl = document.getElementById('catGroupTitle');
+  const grid = document.getElementById('catDrugGrid');
+  // Deselect
+  document.querySelectorAll('.disease-group-btn').forEach(b => {
+    b.style.borderColor = '#e5e7eb';
+    b.style.boxShadow = 'none';
+  });
+  if (activeGroupIdx === idx) {
+    activeGroupIdx = null;
+    listEl.style.display = 'none';
+    return;
+  }
+  activeGroupIdx = idx;
+  const g = DISEASE_GROUPS[idx];
+  // Highlight selected button
+  const btn = document.querySelector(`.disease-group-btn[data-idx="${idx}"]`);
+  if (btn) { btn.style.borderColor = g.color; btn.style.boxShadow = '0 0 0 2px ' + g.color + '33'; }
+  titleEl.innerHTML = `<i class="fa-solid ${escHtml(g.icon)}" style="color:${escHtml(g.color)}"></i> ${escHtml(g.name)}`;
+  grid.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary)"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+  listEl.style.display = 'block';
+  try {
+    // Single request with all categories for this group
+    const resp = await fetch('/api/drugs/search?categories=' + encodeURIComponent(JSON.stringify(g.categories)) + '&per_page=200');
+    const data = await resp.json();
+    const allDrugs = data.drugs || [];
+    if (!allDrugs.length) {
+      grid.innerHTML = '<div style="padding:16px;color:var(--text-secondary)">No drugs found in this group.</div>';
+    } else {
+      grid.innerHTML = allDrugs.map(d => `
+        <div class="drug-card" onclick="window.location='/medication/${d.id}'">
+          <div class="drug-card-name">${escHtml(d.drug_name)}</div>
+          <div class="drug-card-generic">${escHtml(d.generic_name)}</div>
+          <div class="drug-card-tags">
+            ${d.dosage_form ? `<span class="drug-tag">${escHtml(d.dosage_form)}</span>` : ''}
+            ${d.strength    ? `<span class="drug-tag">${escHtml(d.strength)}</span>` : ''}
+            ${d.category    ? `<span class="drug-tag" style="background:#ede9fe;color:#5b21b6">${escHtml(d.category)}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch(e) {
+    console.error(e);
+    grid.innerHTML = '<div style="padding:16px;color:#dc2626">Failed to load drugs.</div>';
+  }
+}
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Search Medicine Database ─────────────────────────────────────────────────
+(function() {
+  const searchInput = document.getElementById('drugSearchInput');
+  const categoryFilter = document.getElementById('categoryFilter');
+  const searchBtn = document.getElementById('drugSearchBtn');
+  const drugContainer = document.getElementById('drugContainer');
+  if (!searchInput || !drugContainer) return;
+
+  async function doSearch() {
+    const q = searchInput.value.trim();
+    const cat = categoryFilter ? categoryFilter.value : '';
+
+    drugContainer.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)"><i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem"></i><div style="margin-top:8px">Searching…</div></div>';
+
+    try {
+      const resp = await fetch('/api/drugs/search?q=' + encodeURIComponent(q) + '&category=' + encodeURIComponent(cat) + '&per_page=50');
+      const data = await resp.json();
+      const countEl = document.getElementById('drugCount');
+      if (countEl) countEl.textContent = data.total + ' medicines';
+
+      if (!data.drugs.length) {
+        let msg = 'No medicines found.';
+        if (q && cat) msg = 'No medicines found for "' + escHtml(q) + '" in category "' + escHtml(cat) + '".';
+        else if (q) msg = 'No medicines found for "' + escHtml(q) + '".';
+        else if (cat) msg = 'No medicines found in category "' + escHtml(cat) + '".';
+        drugContainer.innerHTML = '<div class="no-result-box"><div class="no-result-title">' + msg + '</div><div style="font-size:.85rem;color:var(--text-secondary);margin-top:8px">Try a different search term or category.</div></div>';
+        return;
+      }
+
+      drugContainer.innerHTML = data.drugs.map(function(d) {
+        var arName = d.drug_name_ar ? ' <span style="font-weight:400;color:var(--text-secondary);font-size:.82rem">' + escHtml(d.drug_name_ar) + '</span>' : '';
+        var arGen = d.generic_name_ar ? ' — ' + escHtml(d.generic_name_ar) : '';
+        return '<div class="drug-card" onclick="window.location=\'/medication/' + d.id + '\'">' +
+          '<div class="drug-card-name">' + escHtml(d.drug_name) + arName + '</div>' +
+          '<div class="drug-card-generic">' + escHtml(d.generic_name) + arGen + '</div>' +
+          '<div class="drug-card-tags">' +
+            (d.dosage_form ? '<span class="drug-tag">' + escHtml(d.dosage_form) + '</span>' : '') +
+            (d.strength ? '<span class="drug-tag">' + escHtml(d.strength) + '</span>' : '') +
+            (d.category ? '<span class="drug-tag">' + escHtml(d.category) + '</span>' : '') +
+          '</div></div>';
+      }).join('');
+    } catch (e) {
+      console.error(e);
+      drugContainer.innerHTML = '<div class="no-result-box"><div class="no-result-title">Search failed.</div></div>';
+    }
+  }
+
+  // Search button click
+  searchBtn.addEventListener('click', function() { doSearch(); });
+
+  // Enter key
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+  });
+
+  // Category change — search immediately
+  categoryFilter.addEventListener('change', function() { doSearch(); });
+
+  // Typing — debounced search
+  var timer;
+  searchInput.addEventListener('input', function() {
+    clearTimeout(timer);
+    timer = setTimeout(doSearch, 400);
+  });
+})();
+</script>
+{% endblock %}

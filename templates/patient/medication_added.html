@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Medication Added — CAPSULE{% endblock %}
+{% block page_title %}Medication Added{% endblock %}
+
+{% block content %}
+<style>
+  .confirm-success { background:linear-gradient(135deg,#166534,#15803d); border-radius:var(--radius); padding:24px 28px; color:#fff; margin-bottom:24px; }
+  .warn-box { border-left:5px solid; border-radius:0 var(--radius) var(--radius) 0; padding:18px 20px; margin-bottom:16px; }
+  .warn-box.high   { border-color:#dc2626; background:#fef2f2; }
+  .warn-box.medium { border-color:#d97706; background:#fffbeb; }
+  .warn-box.low    { border-color:#2563eb; background:#eff6ff; }
+  .warn-box.lt     { border-color:#d97706; background:#fffbeb; }
+  .risk-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 12px; border-radius:999px;
+                font-size:.72rem; font-weight:700; color:#fff; }
+  .risk-badge.high   { background:#dc2626; }
+  .risk-badge.medium { background:#d97706; }
+  .risk-badge.low    { background:#2563eb; }
+  .action-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px;
+                 font-size:.8rem; font-weight:600; border:1.5px solid; }
+  .action-chip.doctor     { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+  .action-chip.pharmacist { background:#f5f3ff; border-color:#c4b5fd; color:#6d28d9; }
+  .action-chip.emergency  { background:#fef2f2; border-color:#fca5a5; color:#dc2626; }
+  .monitoring-list li { font-size:.82rem; color:var(--text-secondary); line-height:1.8; }
+</style>
+
+<!-- Success Banner -->
+<div class="confirm-success">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <i class="fa-solid fa-circle-check" style="font-size:2rem;opacity:.9"></i>
+    <div>
+      <h2 style="margin:0;font-size:1.25rem">{{ med.medication_name }} has been added</h2>
+      <p style="margin:4px 0 0;opacity:.85;font-size:.875rem">
+        Status: <strong>{{ 'Currently taking' if med.status == 'current' else 'Previous / Stopped' }}</strong>
+        {% if med.dosage %} &nbsp;·&nbsp; {{ med.dosage }}{% endif %}
+        {% if med.start_date %} &nbsp;·&nbsp; Since {{ med.start_date.strftime('%d %b %Y') }}{% endif %}
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Long-Term Effect Warning ─────────────────────────────────────────────── -->
+{% if long_term %}
+{% set sev = long_term.severity or 'medium' %}
+<div class="card mb-3" style="border-color:{% if sev == 'high' %}#fca5a5{% elif sev == 'medium' %}#fcd34d{% else %}#93c5fd{% endif %}">
+  <div class="card-header" style="background:{% if sev == 'high' %}#fef2f2{% elif sev == 'medium' %}#fffbeb{% else %}#eff6ff{% endif %};
+                                   border-bottom-color:{% if sev == 'high' %}#fca5a5{% elif sev == 'medium' %}#fcd34d{% else %}#93c5fd{% endif %}">
+    <h3 class="card-title" style="color:{% if sev == 'high' %}#991b1b{% elif sev == 'medium' %}#92400e{% else %}#1e40af{% endif %}">
+      <i class="fa-solid fa-clock-rotate-left"></i> Long-Term Use Warning
+      <span style="margin-left:10px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:700;color:#fff;
+                   background:{% if sev == 'high' %}#dc2626{% elif sev == 'medium' %}#d97706{% else %}#2563eb{% endif %}">
+        {{ sev|upper }} CONCERN
+      </span>
+    </h3>
+  </div>
+  <div class="card-body" style="padding:20px">
+    {% if long_term.effect_summary %}
+    <p style="font-weight:700;margin:0 0 10px;font-size:.925rem">{{ long_term.effect_summary }}</p>
+    {% endif %}
+    {% if long_term.description %}
+    <p style="margin:0 0 14px;font-size:.875rem;color:var(--text-secondary);line-height:1.6">
+      {{ long_term.description }}
+    </p>
+    {% endif %}
+    {% if long_term.duration %}
+    <p style="font-size:.82rem;margin:0 0 12px">
+      <i class="fa-solid fa-calendar-days" style="color:#d97706"></i>
+      <strong>Duration concern:</strong> Effects associated with use lasting {{ long_term.duration }}
+    </p>
+    {% endif %}
+    {% if long_term.monitoring %}
+    <div style="margin-bottom:14px">
+      <p style="font-size:.82rem;font-weight:700;margin:0 0 6px"><i class="fa-solid fa-stethoscope"></i> Recommended monitoring:</p>
+      <ul class="monitoring-list" style="margin:0;padding-left:20px">
+        {% for item in long_term.monitoring %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if long_term.warning %}
+    <div style="background:rgba(0,0,0,.05);border-radius:8px;padding:14px;font-size:.875rem">
+      <i class="fa-solid fa-hand-holding-medical" style="color:#d97706"></i>
+      <strong> What you should do:</strong><br>
+      <span style="color:var(--text-secondary)">{{ long_term.warning }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Drug Interaction Alerts ──────────────────────────────────────────────── -->
+{% if new_interactions %}
+<div class="card mb-3" style="border-color:#fca5a5">
+  <div class="card-header" style="background:#fef2f2;border-bottom-color:#fca5a5">
+    <h3 class="card-title" style="color:#991b1b">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      Medicine Interaction Alert{{ 's' if new_interactions|length != 1 }} Detected ({{ new_interactions|length }})
+    </h3>
+  </div>
+  <div class="card-body" style="padding:16px">
+    <p style="font-size:.82rem;color:var(--text-secondary);margin:0 0 14px">
+      Adding <strong>{{ med.medication_name }}</strong> may interact with your existing medications:
+    </p>
+    {% for ia in new_interactions %}
+    <div class="warn-box {{ ia.risk_level }}" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div>
+          <span style="font-weight:700;font-size:.9rem">{{ ia.drug_a }}</span>
+          <span style="color:var(--text-secondary);margin:0 8px"><i class="fa-solid fa-arrow-right-arrow-left" style="font-size:.75rem"></i></span>
+          <span style="font-weight:700;font-size:.9rem">{{ ia.drug_b }}</span>
+        </div>
+        <span class="risk-badge {{ ia.risk_level }}">
+          <i class="fa-solid {{ ia.badge.icon }}"></i>
+          {{ ia.badge.label }}
+        </span>
+      </div>
+      <p style="margin:0 0 10px;font-size:.875rem">{{ ia.interaction_description }}</p>
+
+      {% if ia.patient_guidance %}
+      <!-- Action guidance block -->
+      {% set guidance = ia.patient_guidance %}
+      <div style="background:rgba(0,0,0,.05);border-radius:8px;padding:12px 14px;font-size:.875rem">
+        <p style="margin:0 0 8px;font-weight:700">
+          <i class="fa-solid fa-circle-info"></i> What to do:
+        </p>
+        <p style="margin:0 0 10px;color:var(--text-secondary)">{{ guidance }}</p>
+        <!-- Action chips based on risk level -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          {% if ia.risk_level == 'high' %}
+          <span class="action-chip emergency">
+            <i class="fa-solid fa-phone"></i> Contact your doctor immediately
+          </span>
+          <span class="action-chip pharmacist">
+            <i class="fa-solid fa-pills"></i> Alert your pharmacist
+          </span>
+          {% elif ia.risk_level == 'medium' %}
+          <span class="action-chip doctor">
+            <i class="fa-solid fa-user-doctor"></i> Discuss with your doctor
+          </span>
+          <span class="action-chip pharmacist">
+            <i class="fa-solid fa-pills"></i> Ask your pharmacist
+          </span>
+          {% else %}
+          <span class="action-chip pharmacist">
+            <i class="fa-solid fa-pills"></i> Mention to your pharmacist
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── No warnings ──────────────────────────────────────────────────────────── -->
+{% if not long_term and not new_interactions %}
+<div class="card mb-3" style="border-color:#86efac">
+  <div class="card-body" style="padding:20px;text-align:center">
+    <i class="fa-solid fa-shield-heart" style="font-size:2rem;color:#16a34a;display:block;margin-bottom:10px"></i>
+    <p style="margin:0;font-size:.9rem;color:var(--text-secondary)">
+      No long-term effect warnings or medicine interaction alerts found for <strong>{{ med.medication_name }}</strong>.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Navigation ───────────────────────────────────────────────────────────── -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+  <a href="{{ url_for('patient_medications') }}" class="btn btn-primary">
+    <i class="fa-solid fa-pills"></i> View All My Medications
+  </a>
+  <a href="{{ url_for('patient_dashboard') }}" class="btn btn-outline">
+    <i class="fa-solid fa-gauge-high"></i> Back to Dashboard
+  </a>
+  <a href="{{ url_for('add_patient_medication') }}" class="btn btn-outline">
+    <i class="fa-solid fa-plus"></i> Add Another
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,733 @@
+{% extends "base.html" %}
+{% block title %}{{ drug.display_name }}{% endblock %}
+{% block page_title %}Medication Detail{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Tab system ─────────────────────────────────────────── */
+.detail-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:0; }
+.detail-tab  { padding:10px 18px; font-size:.85rem; font-weight:700; color:var(--text-secondary);
+               cursor:pointer; border:none; background:none; border-bottom:3px solid transparent;
+               margin-bottom:-2px; transition:color .15s, border-color .15s; border-radius:0; }
+.detail-tab:hover  { color:var(--primary); }
+.detail-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+.tab-panel  { display:none; }
+.tab-panel.active { display:block; }
+
+/* ── Bilingual block ────────────────────────────────────── */
+.bilingual { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.bilingual .ar { direction:rtl; font-family:'Segoe UI', Tahoma, sans-serif; }
+@media(max-width:600px){ .bilingual { grid-template-columns:1fr; } }
+
+/* ── Info grid ──────────────────────────────────────────── */
+.info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:16px; }
+.info-item .label { font-size:.7rem; font-weight:700; color:var(--text-secondary);
+                    text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.info-item .value { font-size:.88rem; font-weight:600; color:var(--text); }
+
+/* ── Bullet list ────────────────────────────────────────── */
+.clinical-list { list-style:none; margin:0; padding:0; }
+.clinical-list li { padding:7px 0; border-bottom:1px solid var(--border); font-size:.875rem;
+                    display:flex; align-items:baseline; gap:8px; }
+.clinical-list li:last-child { border-bottom:none; }
+.clinical-list li::before { content:''; width:6px; height:6px; border-radius:50%;
+                             background:var(--primary); flex-shrink:0; margin-top:5px; }
+
+/* ── Color swatch ───────────────────────────────────────── */
+.color-swatch { width:18px; height:18px; border-radius:50%; border:2px solid var(--border);
+                display:inline-block; vertical-align:middle; margin-right:6px; }
+
+/* ── Quick-stat bar ─────────────────────────────────────── */
+.quick-stat { text-align:center; padding:12px 8px; }
+.quick-stat .qs-val { font-size:1rem; font-weight:800; color:var(--text); }
+.quick-stat .qs-lbl { font-size:.68rem; color:var(--text-secondary); text-transform:uppercase;
+                      letter-spacing:.4px; margin-top:2px; }
+
+/* ── Warning banner ─────────────────────────────────────── */
+.warn-banner { background:#fef2f2; border:1.5px solid #fca5a5; border-radius:var(--radius);
+               padding:14px 18px; margin-bottom:20px; display:flex; gap:14px; align-items:flex-start; }
+.long-term-banner { background:#fffbeb; border:1.5px solid #fcd34d; border-radius:var(--radius);
+                    padding:14px 18px; margin-bottom:16px; display:flex; gap:14px; align-items:flex-start; }
+
+/* ── Shelf-life bar ─────────────────────────────────────── */
+.shelf-bar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; margin-top:6px; }
+.shelf-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--success),#a3e635); }
+
+/* ── Tag chips ──────────────────────────────────────────── */
+.tag-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:.75rem;
+            font-weight:600; margin:3px 3px 3px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Breadcrumb ─────────────────────────────────────────────────────────── #}
+<div style="font-size:.8rem;color:var(--text-secondary);margin-bottom:16px">
+  <a href="{{ url_for('pharmacist_dashboard') }}" style="color:var(--primary)">Medicine Database</a>
+  <i class="fa-solid fa-chevron-right" style="margin:0 6px;font-size:.65rem"></i>
+  {{ drug.display_name }}
+</div>
+
+{# ── Safety warning banner ──────────────────────────────────────────────── #}
+{% if drug.requires_warning and drug.warning_text %}
+<div class="warn-banner">
+  <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;font-size:1.3rem;flex-shrink:0;margin-top:2px"></i>
+  <div>
+    <strong style="color:#991b1b;font-size:.9rem">Safety Warning</strong>
+    <p style="margin:4px 0 0;font-size:.84rem;color:#b91c1c">{{ drug.warning_text }}</p>
+  </div>
+</div>
+{% endif %}
+
+{# ── Hero card ──────────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body" style="padding:24px">
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+
+      {# Drug image #}
+      {% if image_url %}
+      <div style="width:160px;height:160px;flex-shrink:0;border-radius:var(--radius);overflow:hidden;
+                  border:2px solid var(--border);background:#f8fafc;
+                  display:flex;align-items:center;justify-content:center">
+        <img src="{{ image_url }}" alt="{{ drug.display_name }}"
+             style="max-width:100%;max-height:100%;object-fit:contain;padding:10px"
+             onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-pills\' style=\'font-size:3rem;color:var(--primary)\'></i>'">
+      </div>
+      {% else %}
+      <div style="width:100px;height:100px;flex-shrink:0;border-radius:var(--radius);
+                  background:linear-gradient(135deg,var(--primary),var(--secondary));
+                  display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff">
+        {% if drug.dosage_form %}
+          {% set df = drug.dosage_form.lower() %}
+          <i class="fa-solid fa-{{ 'capsules' if 'capsule' in df else 'pills' if 'tablet' in df else 'syringe' if 'inject' in df else 'lungs' if 'inhal' in df else 'droplet' if 'drop' in df else 'jar' if 'cream' in df or 'oint' in df else 'flask-vial' }}"></i>
+        {% else %}
+          <i class="fa-solid fa-pills"></i>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Name & badges #}
+      <div style="flex:1;min-width:220px">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div>
+            <h1 style="margin:0;font-size:1.65rem;font-weight:900;line-height:1.2">
+              {{ drug.display_name }}
+            </h1>
+            {% if drug.drug_name_ar %}
+            <div style="font-size:1rem;color:var(--text-secondary);direction:rtl;margin-top:2px">
+              {{ drug.drug_name_ar }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        {# Generic name #}
+        <div style="font-size:.95rem;color:var(--text-secondary);margin-bottom:12px">
+          {% if drug.generic_name %}
+            <span style="font-weight:600">{{ drug.generic_name }}</span>
+            {% if drug.generic_name_ar %} · <span style="direction:rtl;display:inline">{{ drug.generic_name_ar }}</span>{% endif %}
+          {% endif %}
+          {% if drug.strength_label %}
+            <span style="margin-left:8px;background:var(--bg);border:1px solid var(--border);
+                         border-radius:4px;padding:1px 8px;font-size:.8rem;font-weight:700">
+              {{ drug.strength_label }}
+            </span>
+          {% endif %}
+        </div>
+
+        {# Salt composition #}
+        {% if drug.salt_composition %}
+        <div style="font-size:.8rem;color:var(--text-secondary);margin-bottom:12px">
+          <i class="fa-solid fa-atom" style="color:var(--primary)"></i>
+          <strong>Salt:</strong> {{ drug.salt_composition }}
+        </div>
+        {% endif %}
+
+        {# Badges #}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          {% if drug.legal_class %}
+          {% set lc = drug.legal_class.lower() %}
+          <span style="padding:4px 12px;border-radius:999px;font-size:.75rem;font-weight:700;
+                       background:{{ '#fee2e2' if lc == 'prescription' else '#dcfce7' if lc == 'otc' else '#fef3c7' }};
+                       color:{{ '#991b1b' if lc == 'prescription' else '#166534' if lc == 'otc' else '#92400e' }};
+                       border:1px solid {{ '#fca5a5' if lc == 'prescription' else '#86efac' if lc == 'otc' else '#fcd34d' }}">
+            <i class="fa-solid fa-{{ 'lock' if lc == 'prescription' else 'unlock' if lc == 'otc' else 'shield-halved' }}"></i>
+            {{ drug.legal_class | capitalize }}
+          </span>
+          {% endif %}
+          {% if drug.dosage_form %}
+          <span class="tag-chip" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe">
+            <i class="fa-solid fa-pills"></i> {{ drug.dosage_form }}
+          </span>
+          {% endif %}
+          {% if drug.admin_route %}
+          <span class="tag-chip" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">
+            <i class="fa-solid fa-route"></i> {{ drug.admin_route }}
+          </span>
+          {% endif %}
+          {% if drug.category %}
+          <span class="tag-chip" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd">
+            <i class="fa-solid fa-tag"></i> {{ drug.category }}
+          </span>
+          {% endif %}
+        </div>
+
+        {# Quick stats bar #}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
+                    gap:1px;background:var(--border);border-radius:var(--radius-sm);overflow:hidden;
+                    border:1px solid var(--border)">
+          {% if drug.color %}
+          <div class="quick-stat" style="background:#fff">
+            <div class="qs-val">
+              <span class="color-swatch" style="background:{{ drug.color.split('/')[0].strip().lower() }}"></span>
+              {{ drug.color | title }}
+            </div>
+            <div class="qs-lbl">Color</div>
+          </div>
+          {% endif %}
+          {% if drug.shape %}
+          <div class="quick-stat" style="background:#fff">
+            <div class="qs-val">{{ drug.shape | title }}</div>
+            <div class="qs-lbl">Shape</div>
+          </div>
+          {% endif %}
+          {% if drug.imprint_code %}
+          <div class="quick-stat" style="background:#fff">
+            <div class="qs-val" style="font-family:monospace">{{ drug.imprint_code }}</div>
+            <div class="qs-lbl">Imprint</div>
+          </div>
+          {% endif %}
+          {% if drug.price %}
+          <div class="quick-stat" style="background:#fff">
+            <div class="qs-val" style="color:var(--success)">SAR {{ drug.price }}</div>
+            <div class="qs-lbl">Price</div>
+          </div>
+          {% endif %}
+          {% if drug.manufacturer %}
+          <div class="quick-stat" style="background:#fff">
+            <div class="qs-val" style="font-size:.8rem">{{ drug.manufacturer }}</div>
+            <div class="qs-lbl">Manufacturer</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Two-column layout ──────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start">
+
+  {# ── LEFT: Main content with tabs ─────────────────────────────────────── #}
+  <div>
+
+    {# Build a list of active tabs #}
+    {% set has_clinical = drug.indications or drug.side_effects or drug.contraindications %}
+    {% set has_physical = drug.color or drug.shape or drug.imprint_code or drug.dosage_form or drug.package_type or drug.package_size %}
+    {% set has_longterm = drug.long_term_effect and drug.long_term_description %}
+
+    {# Tab navigation #}
+    <div class="detail-tabs" id="detailTabs">
+      <button class="detail-tab active" data-tab="overview">
+        <i class="fa-solid fa-circle-info"></i> Overview
+      </button>
+      {% if has_clinical %}
+      <button class="detail-tab" data-tab="clinical">
+        <i class="fa-solid fa-stethoscope"></i> Clinical Use
+      </button>
+      {% endif %}
+      {% if has_physical %}
+      <button class="detail-tab" data-tab="physical">
+        <i class="fa-solid fa-shapes"></i> Physical
+      </button>
+      {% endif %}
+      {% if has_longterm %}
+      <button class="detail-tab" data-tab="longterm">
+        <i class="fa-solid fa-clock-rotate-left" style="color:#d97706"></i> Long-Term
+      </button>
+      {% endif %}
+    </div>
+
+    {# ── Tab: Overview ── #}
+    <div class="tab-panel active" id="tab-overview">
+
+      {# AI description #}
+      {% if drug.description %}
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-robot" style="color:var(--primary)"></i> AI Description
+          </h3>
+        </div>
+        <div class="card-body">
+          <p style="margin:0;font-size:.875rem;color:var(--text-secondary);
+                    line-height:1.8;font-family:monospace;background:var(--bg);
+                    padding:12px;border-radius:var(--radius-sm)">
+            {{ drug.description }}
+          </p>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Quick clinical info grid #}
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-clipboard-list" style="color:var(--primary)"></i> Drug Information
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="info-grid">
+            {% for label, val, icon in [
+              ('Generic Name',            drug.generic_name,     'fa-flask'),
+              ('Dosage Form',             drug.dosage_form,      'fa-pills'),
+              ('Strength',                drug.strength_label,   'fa-chart-simple'),
+              ('Administration Route',    drug.admin_route,      'fa-route'),
+              ('Therapeutic Category',    drug.category,         'fa-tag'),
+              ('Drug Type',               drug.drug_type,        'fa-atom'),
+              ('Salt Composition',        drug.salt_composition, 'fa-atom'),
+              ('Legal Class',             drug.legal_class,      'fa-gavel'),
+              ('Package Type',            drug.package_type,     'fa-box'),
+              ('Package Size',            drug.package_size,     'fa-ruler'),
+              ('Imprint Code',            drug.imprint_code,     'fa-stamp'),
+              ('Registration No.',        drug.reg_no,           'fa-hashtag'),
+            ] %}
+            {% if val %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid {{ icon }}"></i> {{ label }}</div>
+              <div class="value">{{ val }}</div>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+
+          {# Arabic names section #}
+          {% if drug.drug_name_ar or drug.generic_name_ar %}
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);
+                        text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+              <i class="fa-solid fa-language"></i> Arabic Names
+            </div>
+            <div style="direction:rtl;text-align:right;font-size:.9rem;
+                        font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);
+                        padding:10px 14px;border-radius:var(--radius-sm)">
+              {% if drug.drug_name_ar %}
+              <div style="font-weight:700;margin-bottom:4px">{{ drug.drug_name_ar }}</div>
+              {% endif %}
+              {% if drug.generic_name_ar %}
+              <div style="color:var(--text-secondary)">{{ drug.generic_name_ar }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ── Tab: Clinical Use ── #}
+    {% if has_clinical %}
+    <div class="tab-panel" id="tab-clinical">
+
+      {# Indications #}
+      {% if drug.indications %}
+      <div class="card mb-4">
+        <div class="card-header" style="background:#f0fdf4;border-bottom-color:#bbf7d0">
+          <h3 class="card-title" style="color:#166534">
+            <i class="fa-solid fa-circle-check"></i> Indications & Uses
+          </h3>
+        </div>
+        <div class="card-body">
+          {% if drug.indications_ar %}
+          <div class="bilingual">
+            <div>
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">English</div>
+              <ul class="clinical-list">
+                {% for line in drug.indications.split('\n') if line.strip() %}
+                <li>{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="ar">
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">العربية</div>
+              <ul class="clinical-list" style="direction:rtl">
+                {% for line in drug.indications_ar.split('\n') if line.strip() %}
+                <li style="flex-direction:row-reverse">{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+          {% else %}
+          <ul class="clinical-list">
+            {% for line in drug.indications.split('\n') if line.strip() %}
+            <li>{{ line.strip() }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Side Effects #}
+      {% if drug.side_effects %}
+      <div class="card mb-4">
+        <div class="card-header" style="background:#fffbeb;border-bottom-color:#fcd34d">
+          <h3 class="card-title" style="color:#92400e">
+            <i class="fa-solid fa-triangle-exclamation"></i> Possible Side Effects
+          </h3>
+        </div>
+        <div class="card-body">
+          {% if drug.side_effects_ar %}
+          <div class="bilingual">
+            <div>
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">English</div>
+              <ul class="clinical-list">
+                {% for line in drug.side_effects.split('\n') if line.strip() %}
+                <li style="--bullet:#d97706">{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="ar">
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">العربية</div>
+              <ul class="clinical-list" style="direction:rtl">
+                {% for line in drug.side_effects_ar.split('\n') if line.strip() %}
+                <li style="flex-direction:row-reverse">{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+          {% else %}
+          <ul class="clinical-list">
+            {% for line in drug.side_effects.split('\n') if line.strip() %}
+            <li>{{ line.strip() }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Contraindications #}
+      {% if drug.contraindications %}
+      <div class="card mb-4">
+        <div class="card-header" style="background:#fef2f2;border-bottom-color:#fca5a5">
+          <h3 class="card-title" style="color:#991b1b">
+            <i class="fa-solid fa-ban"></i> Contraindications
+          </h3>
+        </div>
+        <div class="card-body">
+          {% if drug.contraindications_ar %}
+          <div class="bilingual">
+            <div>
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">English</div>
+              <ul class="clinical-list">
+                {% for line in drug.contraindications.split('\n') if line.strip() %}
+                <li>{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="ar">
+              <div style="font-size:.7rem;font-weight:700;color:var(--text-secondary);
+                          text-transform:uppercase;margin-bottom:8px">العربية</div>
+              <ul class="clinical-list" style="direction:rtl">
+                {% for line in drug.contraindications_ar.split('\n') if line.strip() %}
+                <li style="flex-direction:row-reverse">{{ line.strip() }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+          {% else %}
+          <ul class="clinical-list">
+            {% for line in drug.contraindications.split('\n') if line.strip() %}
+            <li>{{ line.strip() }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
+    {# ── Tab: Physical Characteristics ── #}
+    {% if has_physical %}
+    <div class="tab-panel" id="tab-physical">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-eye" style="color:var(--primary)"></i> Physical Characteristics
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="info-grid" style="gap:20px">
+            {% if drug.color %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-palette"></i> Color</div>
+              <div class="value">
+                <span class="color-swatch" style="background:{{ drug.color.split('/')[0].strip().lower() }}"></span>
+                {{ drug.color | title }}
+              </div>
+            </div>
+            {% endif %}
+            {% if drug.shape %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-shapes"></i> Shape</div>
+              <div class="value">{{ drug.shape | title }}</div>
+            </div>
+            {% endif %}
+            {% if drug.imprint_code %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-stamp"></i> Imprint Code</div>
+              <div class="value" style="font-family:monospace;background:var(--bg);
+                                       padding:2px 8px;border-radius:4px;display:inline-block">
+                {{ drug.imprint_code }}
+              </div>
+            </div>
+            {% endif %}
+            {% if drug.dosage_form %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-pills"></i> Dosage Form</div>
+              <div class="value">{{ drug.dosage_form }}</div>
+            </div>
+            {% endif %}
+            {% if drug.package_type %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-box"></i> Package Type</div>
+              <div class="value">{{ drug.package_type }}</div>
+            </div>
+            {% endif %}
+            {% if drug.package_size %}
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-ruler"></i> Package Size</div>
+              <div class="value">{{ drug.package_size }}</div>
+            </div>
+            {% endif %}
+          </div>
+
+          {# Visual appearance summary box #}
+          {% if drug.color or drug.shape or drug.dosage_form %}
+          <div style="margin-top:20px;padding:14px 18px;border-radius:var(--radius-sm);
+                      background:var(--bg);border:1px solid var(--border);font-size:.875rem">
+            <i class="fa-solid fa-magnifying-glass" style="color:var(--primary)"></i>
+            <strong>Appearance:</strong>
+            {{ drug.color | title if drug.color else '' }}
+            {{ drug.shape | lower if drug.shape else '' }}
+            {{ drug.dosage_form | lower if drug.dosage_form else '' }}
+            {% if drug.imprint_code %}imprinted with <strong>{{ drug.imprint_code }}</strong>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Tab: Long-Term Effects ── #}
+    {% if has_longterm %}
+    <div class="tab-panel" id="tab-longterm">
+      <div class="long-term-banner">
+        <i class="fa-solid fa-clock-rotate-left" style="color:#d97706;font-size:1.3rem;flex-shrink:0;margin-top:2px"></i>
+        <div>
+          <strong style="color:#92400e">Long-Term Use Notice</strong>
+          <p style="margin:4px 0 0;font-size:.84rem;color:#78350f">
+            This medication requires monitoring during extended use.
+          </p>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header" style="background:#fffbeb;border-bottom-color:#fcd34d">
+          <h3 class="card-title" style="color:#92400e">
+            <i class="fa-solid fa-calendar-check"></i> Long-Term Effect Profile
+          </h3>
+        </div>
+        <div class="card-body">
+          {% if drug.long_term_duration %}
+          <div style="margin-bottom:14px">
+            <div class="info-item">
+              <div class="label"><i class="fa-solid fa-hourglass-half"></i> Duration of Concern</div>
+              <div class="value">{{ drug.long_term_duration }}</div>
+            </div>
+          </div>
+          {% endif %}
+          {% if drug.long_term_description %}
+          <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--radius-sm);
+                      padding:14px;font-size:.875rem;color:#78350f;line-height:1.7">
+            {{ drug.long_term_description }}
+          </div>
+          {% endif %}
+          {% if drug.requires_warning and drug.warning_text %}
+          <div style="margin-top:14px;background:#fef2f2;border:1px solid #fca5a5;
+                      border-radius:var(--radius-sm);padding:14px;font-size:.875rem;color:#991b1b">
+            <i class="fa-solid fa-hand-raised"></i>
+            <strong>Important:</strong> {{ drug.warning_text }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# end LEFT #}
+
+  {# ── RIGHT: Sidebar ────────────────────────────────────────────────────── #}
+  <div>
+
+    {# Drug photo #}
+    {% if image_url %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-image" style="color:var(--primary)"></i> Drug Photo</h3>
+      </div>
+      <div class="card-body" style="padding:12px;text-align:center">
+        <img src="{{ image_url }}" alt="{{ drug.display_name }}"
+             style="max-width:100%;max-height:200px;object-fit:contain;border-radius:var(--radius-sm)"
+             onerror="this.closest('.card').style.display='none'">
+        <div style="font-size:.7rem;color:var(--text-secondary);margin-top:8px">
+          <i class="fa-solid fa-circle-info"></i> Drug Vision Dataset
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Storage & Regulatory #}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-shield-halved" style="color:var(--success)"></i> Storage & Info
+        </h3>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+
+        {% if drug.storage %}
+        <div>
+          <div class="info-item">
+            <div class="label"><i class="fa-solid fa-temperature-low"></i> Storage Conditions</div>
+            <div class="value" style="color:var(--primary)">{{ drug.storage }}</div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if drug.shelf_life %}
+        <div>
+          <div class="info-item">
+            <div class="label"><i class="fa-solid fa-hourglass-half"></i> Shelf Life</div>
+            <div class="value">{{ drug.shelf_life }} months</div>
+          </div>
+          <div class="shelf-bar">
+            <div class="shelf-fill" style="width:{{ [drug.shelf_life * 100 // 60, 100] | min }}%"></div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if drug.manufacturer %}
+        <div class="info-item">
+          <div class="label"><i class="fa-solid fa-industry"></i> Manufacturer</div>
+          <div class="value">{{ drug.manufacturer }}</div>
+        </div>
+        {% endif %}
+
+        {% if drug.price %}
+        <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;
+                    border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-size:.7rem;color:#166534;font-weight:700;text-transform:uppercase;margin-bottom:4px">
+            <i class="fa-solid fa-tag"></i> Public Price
+          </div>
+          <div style="font-size:1.4rem;font-weight:900;color:#15803d">SAR {{ drug.price }}</div>
+        </div>
+        {% endif %}
+
+        {% if drug.reg_no %}
+        <div class="info-item">
+          <div class="label"><i class="fa-solid fa-hashtag"></i> Reg. Number</div>
+          <div class="value" style="font-family:monospace;background:var(--bg);
+                                   padding:2px 8px;border-radius:4px;display:inline-block">
+            {{ drug.reg_no }}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    {# Quick Actions #}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-bolt" style="color:var(--warning)"></i> Actions</h3>
+      </div>
+      <div class="card-body medication-actions">
+    <a href="{{ url_for('identify') }}" class="btn btn-primary btn-sm detail-action-btn">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> New Identification
+    </a>
+
+    {% if current_user.role in ['patient', 'user'] %}
+    <button type="button"
+            class="btn btn-success btn-sm add-detail-med-btn detail-action-btn"
+            data-drug-id="{{ drug.id }}"
+            data-name="{{ drug.drug_name }}">
+        <i class="fa-solid fa-plus"></i> Add to My Medications
+    </button>
+
+    <div id="addMedicationMsg" class="detail-add-msg"></div>
+    {% endif %}
+
+    <a href="/" class="detail-link-btn">
+        <i class="fa-solid fa-arrow-left"></i> Return to Home
+    </a>
+
+    <button class="detail-link-btn" onclick="window.print()">
+        <i class="fa-solid fa-print"></i> Print Details
+    </button>
+</div>
+    </div>
+
+    {# Related Medications #}
+    {% if related %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-link" style="color:var(--secondary)"></i> Related Medications
+        </h3>
+      </div>
+      <div class="card-body" style="padding:8px">
+        {% for r in related %}
+        <a href="{{ url_for('medication_detail', med_id=r.id) }}"
+           style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                  border-radius:var(--radius-sm);text-decoration:none;transition:background .2s"
+           onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--secondary));
+                      display:flex;align-items:center;justify-content:center;color:#fff;font-size:.8rem;flex-shrink:0">
+            {{ r.display_name[0] }}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:.85rem;color:var(--text)">{{ r.display_name }}</div>
+            <div style="font-size:.73rem;color:var(--text-secondary)">{{ r.generic_name or '' }}{% if r.dosage_form %} · {{ r.dosage_form }}{% endif %}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>{# end RIGHT #}
+
+</div>{# end grid #}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────
+document.querySelectorAll('.detail-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}My Medications — CAPSULE{% endblock %}
+{% block page_title %}My Medications{% endblock %}
+
+{% block content %}
+<style>
+  .tab-bar { display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:20px; }
+  .tab-btn { padding:8px 20px; border:none; background:none; cursor:pointer; font-size:.875rem; font-weight:600;
+             color:var(--text-secondary); border-bottom:2.5px solid transparent; margin-bottom:-2px; transition:all .2s; }
+  .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+  .tab-panel { display:none; } .tab-panel.active { display:block; }
+  .med-row { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:start;
+             padding:16px; border-bottom:1px solid var(--border); transition:background .15s; }
+  .med-row:hover { background:var(--bg); }
+  .med-row:last-child { border-bottom:none; }
+  .med-tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
+  .med-tag.current  { background:#dcfce7; color:#166534; }
+  .med-tag.previous { background:#f3f4f6; color:#6b7280; }
+  .longterm-notice { border-left:4px solid #d97706; background:#fffbeb; border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+                     padding:10px 14px; margin-top:8px; font-size:.82rem; }
+  .longterm-section { border:1.5px solid #fcd34d; background:#fffbeb; border-radius:var(--radius); padding:16px; margin-bottom:16px; }
+  .action-chip { display:inline-flex; align-items:center; gap:5px; padding:4px 12px; border-radius:999px;
+                 font-size:.75rem; font-weight:600; border:1.5px solid; margin-right:6px; margin-top:4px; }
+  .action-chip.doctor     { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+  .action-chip.pharmacist { background:#f5f3ff; border-color:#c4b5fd; color:#6d28d9; }
+  .action-chip.emergency  { background:#fef2f2; border-color:#fca5a5; color:#dc2626; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <p style="margin:0;color:var(--text-secondary);font-size:.875rem">
+    {{ current_meds|length }} active · {{ prev_meds|length }} previous
+  </p>
+  <div style="display:flex;gap:8px">
+    {% if interactions %}
+    <span style="display:flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fca5a5;
+                 border-radius:999px;padding:5px 14px;font-size:.8rem;font-weight:700;color:#991b1b">
+      <i class="fa-solid fa-triangle-exclamation"></i> {{ interactions|length }} Interaction{{ 's' if interactions|length != 1 }}
+    </span>
+    {% endif %}
+    <a href="{{ url_for('add_patient_medication') }}" class="btn btn-primary">
+      <i class="fa-solid fa-plus"></i> Add Medication
+    </a>
+  </div>
+</div>
+
+<!-- Interaction Summary Banner -->
+{% if interactions %}
+<div class="card mb-3" style="border-color:#fca5a5">
+  <div class="card-header" style="background:#fef2f2;border-bottom-color:#fca5a5">
+    <h3 class="card-title" style="color:#991b1b">
+      <i class="fa-solid fa-triangle-exclamation"></i> Medicine Interaction Alerts
+    </h3>
+  </div>
+  <div class="card-body" style="padding:16px">
+    {% for ia in interactions %}
+    <div style="padding:12px;border:1.5px solid;border-radius:var(--radius-sm);margin-bottom:10px;
+               {% if ia.risk_level == 'high' %}border-color:#fca5a5;background:#fef2f2
+               {% elif ia.risk_level == 'medium' %}border-color:#fcd34d;background:#fffbeb
+               {% else %}border-color:#93c5fd;background:#eff6ff{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span style="font-weight:700;font-size:.875rem">{{ ia.drug_a }} ↔ {{ ia.drug_b }}</span>
+        <span style="padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;color:#fff;
+                     background:{% if ia.risk_level == 'high' %}#dc2626{% elif ia.risk_level == 'medium' %}#d97706{% else %}#2563eb{% endif %}">
+          <i class="fa-solid {{ ia.badge.icon }}"></i> {{ ia.badge.label }}
+        </span>
+      </div>
+      <p style="margin:6px 0 8px;font-size:.82rem">{{ ia.interaction_description }}</p>
+      {% if ia.patient_guidance %}
+      <div style="background:rgba(0,0,0,.04);border-radius:6px;padding:10px 12px;font-size:.82rem">
+        <p style="margin:0 0 8px;font-weight:700;color:var(--text-secondary)">
+          <i class="fa-solid fa-circle-info"></i> What to do:
+        </p>
+        <p style="margin:0 0 8px;color:var(--text-secondary)">{{ ia.patient_guidance }}</p>
+        <div>
+          {% if ia.risk_level == 'high' %}
+          <span class="action-chip emergency"><i class="fa-solid fa-phone"></i> Contact your doctor immediately</span>
+          <span class="action-chip pharmacist"><i class="fa-solid fa-pills"></i> Alert your pharmacist</span>
+          {% elif ia.risk_level == 'medium' %}
+          <span class="action-chip doctor"><i class="fa-solid fa-user-doctor"></i> Discuss with your doctor</span>
+          <span class="action-chip pharmacist"><i class="fa-solid fa-pills"></i> Ask your pharmacist</span>
+          {% else %}
+          <span class="action-chip pharmacist"><i class="fa-solid fa-pills"></i> Mention to your pharmacist</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Long-Term Notices Section -->
+{% set lt_meds = current_meds | selectattr('long_term_flag') | list %}
+{% if lt_meds %}
+<div class="card mb-3" style="border-color:#fcd34d">
+  <div class="card-header" style="background:#fffbeb;border-bottom-color:#fcd34d">
+    <h3 class="card-title" style="color:#92400e">
+      <i class="fa-solid fa-clock-rotate-left"></i> Long-Term Use Warnings ({{ lt_meds|length }})
+    </h3>
+  </div>
+  <div class="card-body" style="padding:16px">
+    {% for m in lt_meds %}
+    {% set w = m.long_term_info %}
+    <div class="longterm-section">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <strong style="font-size:.9rem">{{ m.medication_name }}</strong>
+        {% if w %}
+        <span style="padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:700;color:#fff;
+                     background:{% if w.severity == 'high' %}#dc2626{% elif w.severity == 'medium' %}#d97706{% else %}#2563eb{% endif %}">
+          {{ (w.severity or 'low')|upper }} CONCERN
+        </span>
+        {% endif %}
+      </div>
+      {% if w %}
+        {% if w.effect_summary %}
+        <p style="font-weight:700;font-size:.82rem;margin:0 0 6px">{{ w.effect_summary }}</p>
+        {% endif %}
+        {% if w.description %}
+        <p style="font-size:.82rem;color:var(--text-secondary);margin:0 0 8px;line-height:1.6">{{ w.description }}</p>
+        {% endif %}
+        {% if w.duration %}
+        <p style="font-size:.78rem;margin:0 0 8px">
+          <i class="fa-solid fa-calendar-days" style="color:#d97706"></i>
+          Effects associated with use lasting <strong>{{ w.duration }}</strong>
+        </p>
+        {% endif %}
+        {% if w.monitoring %}
+        <p style="font-size:.78rem;font-weight:700;margin:0 0 4px">Recommended monitoring:</p>
+        <ul style="margin:0 0 8px;padding-left:20px">
+          {% for item in w.monitoring %}
+          <li style="font-size:.78rem;color:var(--text-secondary)">{{ item }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if w.warning %}
+        <div style="background:rgba(0,0,0,.05);border-radius:6px;padding:10px;font-size:.82rem;margin-top:4px">
+          <i class="fa-solid fa-hand-holding-medical" style="color:#d97706"></i>
+          <strong> What to do:</strong> {{ w.warning }}
+        </div>
+        {% endif %}
+      {% else %}
+        <p style="font-size:.82rem;color:var(--text-secondary);margin:0">
+          This medication may have long-term effects. Consult your doctor or pharmacist for guidance.
+        </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Tab Navigation -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('current', this)">
+    <i class="fa-solid fa-pills"></i> Current
+    <span style="background:var(--primary);color:#fff;padding:1px 8px;border-radius:999px;font-size:.7rem;margin-left:6px">
+      {{ current_meds|length }}
+    </span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('previous', this)">
+    <i class="fa-solid fa-clock-rotate-left"></i> Previous
+    <span style="background:var(--border);color:var(--text-secondary);padding:1px 8px;border-radius:999px;font-size:.7rem;margin-left:6px">
+      {{ prev_meds|length }}
+    </span>
+  </button>
+</div>
+
+<!-- Current Medications Tab -->
+<div id="tab-current" class="tab-panel active">
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      {% if current_meds %}
+        {% for med in current_meds %}
+        <div class="med-row">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+              <strong style="font-size:.95rem">{{ med.medication_name }}</strong>
+              <span class="med-tag current">Active</span>
+              {% if med.long_term_flag %}
+              <span style="background:#fffbeb;border:1px solid #fcd34d;
+                           color:#92400e;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:600">
+                <i class="fa-solid fa-clock"></i> Long-Term
+              </span>
+              {% endif %}
+            </div>
+            <div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:6px">
+              {% if med.dosage %}<span><i class="fa-solid fa-capsules"></i> {{ med.dosage }}</span>{% endif %}
+              {% if med.start_date %} &nbsp;·&nbsp; <span><i class="fa-solid fa-calendar"></i> Since {{ med.start_date.strftime('%d %b %Y') }}</span>{% endif %}
+              {% if med.prescribed_by %} &nbsp;·&nbsp; <span><i class="fa-solid fa-user-doctor"></i> {{ med.prescribed_by }}</span>{% endif %}
+            </div>
+            {% if med.notes %}
+            <div style="font-size:.78rem;color:var(--text-secondary);font-style:italic">{{ med.notes }}</div>
+            {% endif %}
+            {% set w = med.long_term_info %}
+            {% if w %}
+            <div class="longterm-notice">
+              <i class="fa-solid fa-circle-exclamation" style="color:#d97706"></i>
+              <strong>Long-Term Use{% if w.effect_summary %}: {{ w.effect_summary }}{% endif %}</strong>
+              {% if w.warning %}
+              <div style="margin-top:5px;color:#78350f">
+                <i class="fa-solid fa-hand-holding-medical"></i> {{ w.warning }}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+          <div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">
+            <form method="POST" action="{{ url_for('update_patient_medication', med_id=med.id) }}">
+              <input type="hidden" name="status" value="previous">
+              <button type="submit" class="btn btn-outline" style="font-size:.75rem;padding:4px 10px"
+                      onclick="return confirm('Mark {{ med.medication_name }} as stopped?')">
+                <i class="fa-solid fa-circle-stop"></i> Stop
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('delete_patient_medication', med_id=med.id) }}"
+                  onsubmit="return confirm('Delete this medication?')">
+              <button type="submit" class="btn" style="font-size:.75rem;padding:4px 10px;background:#fee2e2;color:#991b1b;border:none">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:40px;color:var(--text-secondary)">
+        <i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:#16a34a;display:block;margin-bottom:12px;opacity:.5"></i>
+        <p style="margin:0 0 16px">No active medications.</p>
+        <a href="{{ url_for('add_patient_medication') }}" class="btn btn-primary">
+          <i class="fa-solid fa-plus"></i> Add Medication
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Previous Medications Tab -->
+<div id="tab-previous" class="tab-panel">
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      {% if prev_meds %}
+        {% for med in prev_meds %}
+        <div class="med-row">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <strong>{{ med.medication_name }}</strong>
+              <span class="med-tag previous">Stopped</span>
+            </div>
+            <div style="font-size:.82rem;color:var(--text-secondary)">
+              {% if med.start_date %}{{ med.start_date.strftime('%d %b %Y') }}{% endif %}
+              {% if med.end_date %} → {{ med.end_date.strftime('%d %b %Y') }}{% endif %}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <form method="POST" action="{{ url_for('update_patient_medication', med_id=med.id) }}">
+              <input type="hidden" name="status" value="current">
+              <button type="submit" class="btn btn-outline" style="font-size:.75rem;padding:4px 10px">
+                <i class="fa-solid fa-rotate-right"></i> Restart
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('delete_patient_medication', med_id=med.id) }}"
+                  onsubmit="return confirm('Delete this record?')">
+              <button type="submit" class="btn" style="font-size:.75rem;padding:4px 10px;background:#fee2e2;color:#991b1b;border:none">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:.875rem">No previous medications.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+</script>
+{% endblock %}

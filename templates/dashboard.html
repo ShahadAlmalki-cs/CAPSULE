@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div style="background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:var(--radius);padding:28px 32px;color:#fff;margin-bottom:28px;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;background:rgba(255,255,255,.06);border-radius:50%"></div>
+  <h2 style="margin:0 0 6px;font-size:1.5rem;font-weight:800">
+    Welcome, {{ current_user.full_name or current_user.username }}!
+  </h2>
+  <p style="margin:0;opacity:.85;font-size:.9rem">
+    CAPSULE AI Medication Identification System · {{ current_user.role_label }}
+  </p>
+  <a href="{{ url_for('identify') }}" class="btn btn-white btn-sm mt-2">
+    <i class="fa-solid fa-magnifying-glass-plus"></i> Start Identifying
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fa-solid fa-magnifying-glass"></i></div>
+    <div>
+      <div class="stat-value" data-target="{{ total_searches }}">{{ total_searches }}</div>
+      <div class="stat-label">Total Searches</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fa-solid fa-pills"></i></div>
+    <div>
+      <div class="stat-value">AI</div>
+      <div class="stat-label">Powered Engine</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="fa-solid fa-robot"></i></div>
+    <div>
+      <div class="stat-value">3</div>
+      <div class="stat-label">AI Models</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fa-solid fa-database"></i></div>
+    <div>
+      <div class="stat-value">KSA</div>
+      <div class="stat-label">Medicine Database</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions + Recent -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Quick Actions</h3>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <a href="{{ url_for('identify') }}" class="btn btn-primary">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> Identify Medication
+      </a>
+      <a href="{{ url_for('history') }}" class="btn btn-outline">
+        <i class="fa-solid fa-clock-rotate-left"></i> View Search History
+      </a>
+      <a href="{{ url_for('profile') }}" class="btn btn-outline">
+        <i class="fa-solid fa-user-gear"></i> My Profile
+      </a>
+      <a href="{{ url_for('about') }}" class="btn btn-ghost">
+        <i class="fa-solid fa-circle-info"></i> About CAPSULE
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Recent Searches</h3>
+      <a href="{{ url_for('history') }}" style="font-size:.8rem;color:var(--primary)">View all</a>
+    </div>
+    <div class="card-body" style="padding:8px">
+      {% if recent %}
+        {% for s in recent %}
+        <div style="padding:10px 12px;border-radius:var(--radius-sm);transition:background .2s"
+             onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+          <div style="font-size:.85rem;font-weight:600">{{ s.description[:45] }}{% if s.description|length > 45 %}…{% endif %}</div>
+          <div style="font-size:.75rem;color:var(--text-secondary)">
+            {% if s.top_result %}→ <strong>{{ s.top_result }}</strong>{% endif %} · {{ s.time_ago }}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center;padding:32px;color:var(--text-secondary);font-size:.875rem">
+          <i class="fa-solid fa-magnifying-glass" style="font-size:1.5rem;margin-bottom:8px;display:block;opacity:.4"></i>
+          No searches yet. <a href="{{ url_for('identify') }}">Identify your first medication</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
