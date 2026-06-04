@@ -162,7 +162,7 @@
             <div style="font-size:.85rem;font-weight:700">ML Classifier</div>
             <div style="font-size:.72rem;font-weight:600;color:{{ '#16a34a' if ml_loaded else '#d97706' }}">
               <i class="fa-solid fa-{{ 'check-circle' if ml_loaded else 'clock' }}"></i>
-              {{ 'Loaded &amp; Active' if ml_loaded else 'Not trained yet' }}
+              {{ 'Loaded &amp; Active' if ml_loaded else 'Model file available' }}
             </div>
           </div>
         </div>
@@ -1371,7 +1371,7 @@ function closeDrugModal(){document.getElementById('addDrugModal').style.display=
       },
       scales: {
         y: {
-          min: 0.70, max: 1.00,
+          min: 0, max: 1.00,
           ticks: {
             callback: v => (v * 100).toFixed(0) + '%',
             font: { size: 11 }
