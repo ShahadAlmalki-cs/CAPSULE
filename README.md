@@ -24,7 +24,7 @@ The project also supports medication safety through drug interaction checking, l
 - Natural language processing for medication descriptions
 - Attribute extraction such as color, shape, dosage form, and intended use
 - Ranked medication suggestions with relative matching scores
-- Drug interaction checker with risk-level alerts
+- Drug interaction checker 
 - Long-term medication warnings
 - Patient medication list and medication history
 - Search history for identification queries
@@ -213,7 +213,6 @@ Expected result: interaction warning if the interaction exists in the system dat
 - SQLAlchemy
 - SQLite
 - Flask-Login
-- Werkzeug
 
 ### AI and NLP
 
@@ -244,9 +243,7 @@ Expected result: interaction warning if the interaction exists in the system dat
 
 ## Project Structure
 
-```text
-CAPSULE_final/
-│
+CAPSULE/
 ├── app.py
 ├── capsule_database.db
 ├── drug_interaction_checker.py
@@ -257,7 +254,18 @@ CAPSULE_final/
 ├── AI_models/
 │   ├── ai_model.py
 │   ├── nlp_processor.py
+│   ├── train_bilstm.py
+│   ├── train_models.py
 │   └── trained_models/
+│
+├── DataSet/
+│   ├── capsule_dataset.csv
+│   └── medication_images/
+│
+├── app/
+│   ├── models/
+│   ├── services/
+│   └── utils/
 │
 ├── templates/
 │   ├── base.html
@@ -275,32 +283,23 @@ CAPSULE_final/
 │   ├── pharmacist/
 │   └── errors/
 │
-├── static/
-│   ├── css/
-│   ├── js/
-│   └── images/
-│
-└── DataSet/
-```
+└── static/
+    ├── css/
+    ├── js/
+    └── images/
 
 ---
 
 ## Installation and Local Run
 
-### 1. Download or clone the project
+### 1. Download the project
 
-Place the project folder on your device.
+git clone https://github.com/ShahadAlmalki-cs/CAPSULE.git
+cd CAPSULE
 
 ### 2. Create a virtual environment
 
-Using Anaconda:
-
-```bash
-conda create -n capsule_env python=3.11
-conda activate capsule_env
-```
-
-Or using Python venv:
+Python venv:
 
 ```bash
 python -m venv capsule_env
@@ -327,37 +326,11 @@ http://127.0.0.1:5001/
 
 The port may be different depending on the configuration used in `app.py`.
 
----
-
-## Replit Deployment Notes
-
-CAPSULE can be deployed on Replit after ensuring that:
-
-- `app.py` is the main application file
-- `requirements.txt` includes all required packages
-- `templates/` and `static/` folders are included
-- `capsule_database.db` is included if SQLite is used directly
-- The run command is correctly configured
-
-Typical run command:
-
-```bash
-python app.py
-```
-
-For production deployment, additional configuration may be required depending on the hosting environment.
-
----
 
 ## Important Notes
 
 - CAPSULE is a capstone prototype and is not intended to replace professional medical judgment.
 - The system provides decision-support suggestions based on available database records.
-- Match scores are relative similarity scores, not guaranteed probabilities.
-- Medication suggestions should be reviewed by qualified healthcare professionals before use in real medical decisions.
-- The current working scope is text-based medication identification.
-- Image-based medication recognition is not included in the current working implementation.
-
 ---
 
 ## Project Context
