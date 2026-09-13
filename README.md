@@ -243,6 +243,7 @@ Expected result: interaction warning if the interaction exists in the system dat
 
 ## Project Structure
 
+```text
 CAPSULE/
 ├── app.py
 ├── capsule_database.db
@@ -287,7 +288,7 @@ CAPSULE/
     ├── css/
     ├── js/
     └── images/
-
+```
 ---
 
 ## Installation and Local Run
