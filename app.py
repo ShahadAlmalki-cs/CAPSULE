@@ -3198,7 +3198,7 @@ if __name__ == '__main__':
     # Flask debug reloader spawns a child process with WERKZEUG_RUN_MAIN='true'.
     # The parent must NOT touch the DB, otherwise its connection pool locks SQLite
     # and the child hangs. Only init DB in the child (or when reloader is disabled).
-    _use_debug = True
+    _use_debug = False
     if not _use_debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         init_db()
     print("\n" + "="*60)
